@@ -46,6 +46,8 @@ const Chat: React.FC = () => {
     commitAudioBuffer,
     createResponse,
     sendTextMessage,
+    muteSessionAudio,
+    unmuteSessionAudio,
   } = useSession();
 
   async function createNewSession(updatedConfig: SessionConfig) {
@@ -172,7 +174,12 @@ const Chat: React.FC = () => {
       {/* WebRTC Player */}
       <div className="border-t pt-4">
         {session?.mediaStream && (
-          <WebRTCPlayer remoteStream={session?.mediaStream} />
+          <WebRTCPlayer
+            remoteStream={session?.mediaStream}
+            isMuted={session?.isMuted}
+            onMute={muteSessionAudio}
+            onUnmute={unmuteSessionAudio}
+          />
         )}
       </div>
 

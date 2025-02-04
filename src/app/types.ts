@@ -871,6 +871,10 @@ export interface RealtimeSession {
    * Tracks token usage statistics for the session.
    */
   tokenUsage?: TokenUsage;
+  /**
+   * Indicates whether the session audio is muted.
+   */
+  isMuted?: boolean;
 }
 
 /**

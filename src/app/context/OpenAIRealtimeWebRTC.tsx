@@ -94,6 +94,18 @@ interface OpenAIRealtimeWebRTCContextType {
    * @param response - The response object to be sent.
    */
   createResponse: (sessionId: string, response?: ResponseCreateBody) => void;
+
+  /**
+   * Mutes the audio for a specific session.
+   * @param sessionId - The unique identifier for the session to mute.
+   */
+  muteSessionAudio: (sessionId: string) => void;
+
+  /**
+   * Unmutes the audio for a specific session.
+   * @param sessionId - The unique identifier for the session to unmute.
+   */
+  unmuteSessionAudio: (sessionId: string) => void;
 }
 
 // Create the OpenAI Realtime WebRTC context
@@ -121,6 +133,8 @@ export enum SessionActionType {
   ADD_ERROR = 'ADD_ERROR',
   SET_FUNCTION_CALL_HANDLER = 'SET_FUNCTION_CALL_HANDLER',
   UPDATE_TOKEN_USAGE = 'UPDATE_TOKEN_USAGE',
+  MUTE_SESSION_AUDIO = 'MUTE_SESSION_AUDIO',
+  UNMUTE_SESSION_AUDIO = 'UNMUTE_SESSION_AUDIO',
 }
 
 // Action interfaces for type safety
@@ -159,11 +173,20 @@ interface SetFunctionCallHandlerAction {
 
 interface UpdateTokenUsageAction {
   type: SessionActionType.UPDATE_TOKEN_USAGE;
-
   /**
    * Payload containing the session ID and new token usage data.
    */
   payload: { sessionId: string; tokenUsage: TokenUsage };
+}
+
+interface MuteSessionAudioAction {
+  type: SessionActionType.MUTE_SESSION_AUDIO;
+  payload: { sessionId: string };
+}
+
+interface UnmuteSessionAudioAction {
+  type: SessionActionType.UNMUTE_SESSION_AUDIO;
+  payload: { sessionId: string };
 }
 
 // Union type for all actions
@@ -174,7 +197,9 @@ type SessionAction =
   | AddTranscriptAction
   | AddErrorAction
   | SetFunctionCallHandlerAction
-  | UpdateTokenUsageAction;
+  | UpdateTokenUsageAction
+  | MuteSessionAudioAction
+  | UnmuteSessionAudioAction;
 
 // Reducer state type
 type ChannelState = RealtimeSession[];
@@ -230,6 +255,18 @@ export const sessionReducer = (
           ? { ...session, tokenUsage: action.payload.tokenUsage }
           : session
       );
+    case SessionActionType.MUTE_SESSION_AUDIO:
+      return state.map((session) =>
+        session.id === action.payload.sessionId
+          ? { ...session, isMuted: true }
+          : session
+      );
+    case SessionActionType.UNMUTE_SESSION_AUDIO:
+      return state.map((session) =>
+        session.id === action.payload.sessionId
+          ? { ...session, isMuted: false }
+          : session
+      );
 
     default:
       // Ensure exhaustive checks in TypeScript
@@ -248,6 +285,8 @@ export const useSession = (id?: string | undefined) => {
     commitAudioBuffer,
     createResponse,
     startSession,
+    muteSessionAudio,
+    unmuteSessionAudio,
   } = useOpenAIRealtimeWebRTC();
 
   const handleStartSession: StartSession = async (
@@ -283,6 +322,12 @@ export const useSession = (id?: string | undefined) => {
       createResponse: () => {
         throw new Error('Session not started');
       },
+      muteSessionAudio: () => {
+        throw new Error('Session not started');
+      },
+      unmuteSessionAudio: () => {
+        throw new Error('Session not started');
+      },
     };
   }
 
@@ -297,6 +342,12 @@ export const useSession = (id?: string | undefined) => {
     createResponse: (response?: ResponseCreateBody) =>
       createResponse(sessionId, response),
     startSession: startSession,
+    muteSessionAudio: () => {
+      muteSessionAudio(sessionId);
+    },
+    unmuteSessionAudio: () => {
+      unmuteSessionAudio(sessionId);
+    },
   };
 };
 
@@ -638,6 +689,20 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     sendClientEvent(sessionId, commitEvent);
   };
 
+  const muteSessionAudio = (sessionId: string): void => {
+    dispatch({
+      type: SessionActionType.MUTE_SESSION_AUDIO,
+      payload: { sessionId },
+    });
+  };
+
+  const unmuteSessionAudio = (sessionId: string): void => {
+    dispatch({
+      type: SessionActionType.UNMUTE_SESSION_AUDIO,
+      payload: { sessionId },
+    });
+  };
+
   return (
     <OpenAIRealtimeWebRTCContext.Provider
       value={{
@@ -650,6 +715,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         sendAudioChunk,
         commitAudioBuffer,
         createResponse,
+        muteSessionAudio,
+        unmuteSessionAudio,
       }}
     >
       {children}
