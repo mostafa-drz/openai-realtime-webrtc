@@ -875,6 +875,22 @@ export interface RealtimeSession {
    * Indicates whether the session audio is muted.
    */
   isMuted?: boolean;
+
+  /**
+   * ISO 8601 timestamp when the session was started
+   */
+  startTime?: string;
+
+  /**
+   * ISO 8601 timestamp when the session was ended
+   */
+  endTime?: string;
+
+  /**
+   * Duration of the session in seconds
+   * Calculated as the difference between endTime and startTime
+   */
+  duration?: number;
 }
 
 /**

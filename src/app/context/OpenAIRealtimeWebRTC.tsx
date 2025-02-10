@@ -394,7 +394,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     // Create and manage a data channel
     const dc = pc.createDataChannel(sessionId);
 
-    // Add a temporary session to state
+    // Add a temporary session to state with start time
     dispatch({
       type: SessionActionType.ADD_SESSION,
       payload: {
@@ -404,6 +404,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         tokenRef: realtimeSession?.client_secret?.value,
         isConnecting: true,
         isConnected: false,
+        startTime: new Date().toISOString(), // Add start time
       } as RealtimeSession,
     });
 
@@ -567,7 +568,12 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       console.log(`Peer connection for session '${sessionId}' closed.`);
     }
 
-    // Update the session status instead of removing it
+    const endTime = new Date().toISOString();
+    const startTimeMs = session.startTime ? new Date(session.startTime).getTime() : 0;
+    const endTimeMs = new Date(endTime).getTime();
+    const duration = startTimeMs ? (endTimeMs - startTimeMs) / 1000 : 0;
+
+    // Update the session status with timing information
     dispatch({
       type: SessionActionType.UPDATE_SESSION,
       payload: {
@@ -576,9 +582,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         isConnected: false,
         dataChannel: null,
         peer_connection: null,
+        endTime,
+        duration,
       },
     });
-    console.log(`Session '${sessionId}' connection closed.`);
+    console.log(`Session '${sessionId}' connection closed. Duration: ${duration}s`);
   };
 
   /**
