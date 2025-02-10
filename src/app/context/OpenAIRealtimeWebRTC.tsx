@@ -567,12 +567,18 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       console.log(`Peer connection for session '${sessionId}' closed.`);
     }
 
-    // Remove the session from the state
+    // Update the session status instead of removing it
     dispatch({
-      type: SessionActionType.REMOVE_SESSION,
-      payload: { id: sessionId },
+      type: SessionActionType.UPDATE_SESSION,
+      payload: {
+        id: sessionId,
+        isConnecting: false,
+        isConnected: false,
+        dataChannel: null,
+        peer_connection: null,
+      },
     });
-    console.log(`Session '${sessionId}' removed.`);
+    console.log(`Session '${sessionId}' connection closed.`);
   };
 
   /**
