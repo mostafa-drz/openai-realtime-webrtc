@@ -16,6 +16,7 @@ import {
 import tools from './openAITools';
 import Transcripts from './Transcripts';
 import TokenUsage from './TokenUsage';
+import SessionInfo from './SessionInfo';
 
 // Add voice options based on OpenAI's available voices
 const VOICE_OPTIONS = {
@@ -163,43 +164,11 @@ const Chat: React.FC = () => {
   return (
     <div className="w-full max-w-2xl mx-auto p-4 bg-white rounded-lg shadow-lg space-y-6">
       {/* Header Section */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">AI Chat</h1>
-        {/* Token Usage Section */}
-        {session?.tokenUsage && (
-          <div className="mt-2">
-            <TokenUsage
-              inputTokens={session.tokenUsage.inputTokens}
-              outputTokens={session.tokenUsage.outputTokens}
-              totalTokens={session.tokenUsage.totalTokens}
-            />
-          </div>
-        )}
-        <div className="flex items-center space-x-4">
-          {/* Voice Selector */}
-          <select
-            value={selectedVoice}
-            onChange={(e) => handleVoiceChange(e.target.value as VoiceId)}
-            className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
-          >
-            {Object.entries(VOICE_OPTIONS).map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-
-          {/* Mode Switcher */}
-          <select
-            value={mode}
-            onChange={(e) => handleModeChange(e.target.value as 'vad' | 'push-to-talk')}
-            className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
-          >
-            <option value="vad">VAD</option>
-            <option value="push-to-talk">Push-to-Talk</option>
-          </select>
-
-          {/* Start/End Session Button */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold text-gray-800">AI Chat</h1>
+          
+          {/* Session Control */}
           {session?.isConnected ? (
             <button
               onClick={() => closeSession()}
@@ -216,96 +185,135 @@ const Chat: React.FC = () => {
             </button>
           )}
         </div>
-      </div>
 
-      {/* WebRTC Player */}
-      <div className="border-t pt-4">
-        {session?.mediaStream && (
-          <WebRTCPlayer
-            remoteStream={session?.mediaStream}
-            isMuted={session?.isMuted ?? false}
-            onMute={muteSessionAudio}
-            onUnmute={unmuteSessionAudio}
-          />
+        {/* Settings Panel */}
+        <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+          <select
+            value={selectedVoice}
+            onChange={(e) => handleVoiceChange(e.target.value as VoiceId)}
+            className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
+          >
+            {Object.entries(VOICE_OPTIONS).map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={mode}
+            onChange={(e) => handleModeChange(e.target.value as 'vad' | 'push-to-talk')}
+            className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
+          >
+            <option value="vad">VAD</option>
+            <option value="push-to-talk">Push-to-Talk</option>
+          </select>
+        </div>
+
+        {/* Stats Panel */}
+        {session && (
+          <div className="grid grid-cols-2 gap-4">
+            <SessionInfo
+              startTime={session.startTime}
+              endTime={session.endTime}
+              duration={session.duration}
+            />
+            {session.tokenUsage && (
+              <TokenUsage
+                inputTokens={session.tokenUsage.inputTokens}
+                outputTokens={session.tokenUsage.outputTokens}
+                totalTokens={session.tokenUsage.totalTokens}
+              />
+            )}
+          </div>
         )}
       </div>
 
-      {/* Error Section */}
-      {session?.errors && session.errors.length > 0 && (
-        <div className="border-t pt-4">
-          <h2 className="text-lg font-bold text-red-600">Errors</h2>
-          <div className="overflow-y-auto max-h-32 border rounded p-4 bg-red-50">
-            {session.errors.map((error, index) => (
-              <div key={index} className="mb-2">
-                <p className="text-sm text-red-800">
-                  <strong>Error Type:</strong> {error.type}
-                </p>
-                {error.message && (
-                  <p className="text-sm text-red-700">
-                    <strong>Message:</strong> {error.message}
-                  </p>
-                )}
-                {error.code && (
-                  <p className="text-sm text-red-700">
-                    <strong>Code:</strong> {error.code}
-                  </p>
-                )}
-                {error.param && (
-                  <p className="text-sm text-red-700">
-                    <strong>Param:</strong> {error.param}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500">
-                  <strong>Event ID:</strong> {error.event_id} |{' '}
-                  <strong>Timestamp:</strong>{' '}
-                  {new Date(error.timestamp).toLocaleString()}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Transcripts Box */}
-      {session?.transcripts && session?.transcripts?.length > 0 && (
-        <Transcripts transcripts={session.transcripts} />
-      )}
-
-      {/* Mode-Based Input */}
-      {session?.modalities?.includes(Modality.AUDIO) && (
-        <div className="border-t pt-4">
-          {mode === 'push-to-talk' ? (
-            <PushToTalk
-              onRecording={(audio) => {
-                sendAudioChunk(audio);
-              }}
-              onRecordingStopped={() => {
-                commitAudioBuffer();
-                createResponse();
-              }}
+      {/* Main Chat Section */}
+      <div className="space-y-4">
+        {/* WebRTC Player */}
+        {session?.mediaStream && (
+          <div className="border-t pt-4">
+            <WebRTCPlayer
+              remoteStream={session.mediaStream}
+              isMuted={session.isMuted ?? false}
+              onMute={muteSessionAudio}
+              onUnmute={unmuteSessionAudio}
             />
-          ) : (
-            <p className="text-gray-600 text-sm italic">
-              Voice Activity Detection (VAD) mode enabled. Start speaking to
-              interact.
-            </p>
+          </div>
+        )}
+
+        {/* Error Section */}
+        {session?.errors && session.errors.length > 0 && (
+          <div className="border-t pt-4">
+            <h2 className="text-lg font-bold text-red-600">Errors</h2>
+            <div className="overflow-y-auto max-h-32 border rounded p-4 bg-red-50">
+              {session.errors.map((error, index) => (
+                <div key={index} className="mb-2">
+                  <p className="text-sm text-red-800">
+                    <strong>Error Type:</strong> {error.type}
+                  </p>
+                  {error.message && (
+                    <p className="text-sm text-red-700">
+                      <strong>Message:</strong> {error.message}
+                    </p>
+                  )}
+                  {error.code && (
+                    <p className="text-sm text-red-700">
+                      <strong>Code:</strong> {error.code}
+                    </p>
+                  )}
+                  {error.param && (
+                    <p className="text-sm text-red-700">
+                      <strong>Param:</strong> {error.param}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    <strong>Event ID:</strong> {error.event_id} |{' '}
+                    <strong>Timestamp:</strong>{' '}
+                    {new Date(error.timestamp).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Transcripts */}
+        {session?.transcripts && session.transcripts.length > 0 && (
+          <Transcripts transcripts={session.transcripts} />
+        )}
+
+        {/* Input Section */}
+        <div className="border-t pt-4">
+          {/* Audio Input */}
+          {session?.modalities?.includes(Modality.AUDIO) && (
+            <div className="mb-4">
+              {mode === 'push-to-talk' ? (
+                <PushToTalk
+                  onRecording={sendAudioChunk}
+                  onRecordingStopped={() => {
+                    commitAudioBuffer();
+                    createResponse();
+                  }}
+                />
+              ) : (
+                <p className="text-gray-600 text-sm italic">
+                  Voice Activity Detection (VAD) mode enabled. Start speaking to interact.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Text Input */}
+          {session?.modalities?.includes(Modality.TEXT) && (
+            <TextMessageInput
+              onNewMessage={sendTextMessage}
+              onGenerateResponse={createResponse}
+            />
           )}
         </div>
-      )}
-
-      {/* Text Message Input */}
-      {session?.modalities?.includes(Modality.TEXT) && (
-        <div className="border-t pt-4">
-          <TextMessageInput
-            onNewMessage={(message) => {
-              sendTextMessage(message);
-            }}
-            onGenerateResponse={() => {
-              createResponse();
-            }}
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 };
