@@ -11,10 +11,25 @@ import {
   TurnDetectionConfig,
   TurnDetectionType,
   RealtimeEventType,
+  Voice,
 } from '../types';
 import tools from './openAITools';
 import Transcripts from './Transcripts';
 import TokenUsage from './TokenUsage';
+
+// Add voice options based on OpenAI's available voices
+const VOICE_OPTIONS = {
+  alloy: 'Alloy (Neutral)',
+  ash: 'Ash (Neutral)',
+  echo: 'Echo (Male)',
+  coral: 'Coral (Female)',
+  shimmer: 'Shimmer (Female)',
+  ballad: 'Ballad (Male)',
+  sage: 'Sage (Male)',
+  verse: 'Verse (Female)',
+} as const;
+
+type VoiceId = keyof typeof VOICE_OPTIONS;
 
 const defaultTurnDetection: TurnDetectionConfig = {
   type: TurnDetectionType.SERVER_VAD,
@@ -25,11 +40,13 @@ const defaultTurnDetection: TurnDetectionConfig = {
 
 const Chat: React.FC = () => {
   const [mode, setMode] = useState<'vad' | 'push-to-talk'>('vad');
+  const [selectedVoice, setSelectedVoice] = useState<VoiceId>('alloy');
   const [config, setConfig] = useState<SessionConfig>({
     modalities: [Modality.TEXT, Modality.AUDIO],
     input_audio_transcription: {
       model: 'whisper-1',
     },
+    voice: selectedVoice as Voice, // Add voice configuration
     instructions: `
       You are a fortune teller. You can see the future.
     `,
@@ -79,6 +96,25 @@ const Chat: React.FC = () => {
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
           turn_detection: updatedConfig.turn_detection,
+        },
+      });
+    }
+  };
+
+  const handleVoiceChange = (newVoice: VoiceId) => {
+    setSelectedVoice(newVoice);
+    const updatedConfig: SessionConfig = {
+      ...config,
+      voice: newVoice as Voice,
+    };
+    setConfig(updatedConfig);
+
+    // If session is active, update it
+    if (session?.isConnected) {
+      sendClientEvent({
+        type: RealtimeEventType.SESSION_UPDATE,
+        session: {
+          voice: newVoice as Voice,
         },
       });
     }
@@ -140,12 +176,23 @@ const Chat: React.FC = () => {
           </div>
         )}
         <div className="flex items-center space-x-4">
+          {/* Voice Selector */}
+          <select
+            value={selectedVoice}
+            onChange={(e) => handleVoiceChange(e.target.value as VoiceId)}
+            className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
+          >
+            {Object.entries(VOICE_OPTIONS).map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+
           {/* Mode Switcher */}
           <select
             value={mode}
-            onChange={(e) =>
-              handleModeChange(e.target.value as 'vad' | 'push-to-talk')
-            }
+            onChange={(e) => handleModeChange(e.target.value as 'vad' | 'push-to-talk')}
             className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
           >
             <option value="vad">VAD</option>
@@ -176,7 +223,7 @@ const Chat: React.FC = () => {
         {session?.mediaStream && (
           <WebRTCPlayer
             remoteStream={session?.mediaStream}
-            isMuted={session?.isMuted}
+            isMuted={session?.isMuted ?? false}
             onMute={muteSessionAudio}
             onUnmute={unmuteSessionAudio}
           />
