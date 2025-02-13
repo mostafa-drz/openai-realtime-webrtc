@@ -372,10 +372,60 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
   ): Promise<void> => {
     const sessionId = realtimeSession.id;
 
-    // Create a new peer connection with unified-plan semantics
-    const pc = new RTCPeerConnection({
-      iceServers: [], // OpenAI handles this
+    const pc = new RTCPeerConnection({ 
+      iceServers: [] // OpenAI handles this
     });
+
+    // Add negotiation handling
+    pc.onnegotiationneeded = async () => {
+      try {
+        console.log(`Negotiation needed for session '${sessionId}'`);
+        
+        // Create a new offer
+        const offer = await pc.createOffer();
+        
+        // Set it as local description
+        await pc.setLocalDescription(offer);
+        
+        // Send the offer to OpenAI's servers
+        const response = await fetch(
+          `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+          {
+            method: 'POST',
+            body: offer.sdp,
+            headers: {
+              Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
+              'Content-Type': 'application/sdp',
+            },
+          }
+        );
+
+        // Apply the SDP answer from the response
+        const answer = { type: 'answer' as RTCSdpType, sdp: await response.text() };
+        await pc.setRemoteDescription(answer);
+        
+        console.log(`Renegotiation completed for session '${sessionId}'`);
+      } catch (error) {
+        console.error(`Failed to renegotiate session '${sessionId}':`, error);
+        
+        // Add error to session state
+        dispatch({
+          type: SessionActionType.ADD_ERROR,
+          payload: {
+            sessionId,
+            error: {
+              event_id: crypto.randomUUID(),
+              type: 'negotiation_error',
+              code: 'negotiation_failed',
+              message: 'Failed to renegotiate WebRTC connection',
+              param: null,
+              related_event_id: null,
+              timestamp: Date.now(),
+            },
+          },
+        });
+      }
+    };
 
     // Setup connection state monitoring
     pc.oniceconnectionstatechange = () => {
@@ -540,27 +590,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         payload: { id: sessionId },
       });
     });
-
-    // Create an SDP offer and send it to the OpenAI Realtime API
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    const response = await fetch(
-      `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
-      {
-        method: 'POST',
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
-          'Content-Type': 'application/sdp',
-        },
-      }
-    );
-
-    // Apply the SDP answer from the response
-    const answer = { type: 'answer' as RTCSdpType, sdp: await response.text() };
-    console.log({ answer });
-    await pc.setRemoteDescription(answer);
   };
 
   /**
