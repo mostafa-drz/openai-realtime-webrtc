@@ -26,8 +26,8 @@ import {
   ResponseDoneEvent,
   StartSession,
   SessionError,
+  Modality,
 } from '../types';
-import { WebRTC } from '../utils/constants';
 
 /**
  * Context type definition for managing OpenAI Realtime WebRTC sessions.
@@ -378,11 +378,17 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       iceServers: [] // OpenAI handles this
     });
 
-    // Create an audio transceiver BEFORE creating the offer
-    pc.addTransceiver('audio', {
-      direction: 'sendrecv',
-      streams: [new MediaStream()]
-    });
+    // Get user media before creating transceiver
+    if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      
+      // Add tracks to peer connection
+      localStream.getAudioTracks().forEach((track) => {
+        pc.addTrack(track, localStream);
+      });
+    }
 
     // Create data channel
     const dc = pc.createDataChannel(sessionId);
