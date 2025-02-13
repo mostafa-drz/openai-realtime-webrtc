@@ -27,6 +27,7 @@ import {
   StartSession,
   SessionError,
   Modality,
+  SessionCloseOptions,
 } from '../types';
 
 /**
@@ -59,9 +60,10 @@ interface OpenAIRealtimeWebRTCContextType {
    * Ends an active WebRTC session and cleans up its resources.
    *
    * @param sessionId - The unique identifier for the session to close.
-   * @returns A promise that resolves once the session is successfully closed.
+   * @param options - Configuration options for closing behavior.
+   * @param options.removeAfterConnectionClose - Whether to remove the session from state after closing. Defaults to true.
    */
-  closeSession: (sessionId: string) => void;
+  closeSession: (sessionId: string, options?: SessionCloseOptions) => void;
 
   /**
    * Sends a text message to a specific session.
@@ -339,7 +341,7 @@ export const useSession = (id?: string | undefined) => {
 
   return {
     session,
-    closeSession: () => closeSession(sessionId),
+    closeSession: (options?: SessionCloseOptions) => closeSession(sessionId, options),
     sendTextMessage: (message: string) => sendTextMessage(sessionId, message),
     sendClientEvent: (event: RealtimeEvent) =>
       sendClientEvent(sessionId, event),
@@ -372,7 +374,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     functionCallHandler?: (name: string, args: Record<string, unknown>) => void
   ): Promise<void> => {
     const sessionId = realtimeSession.id;
-    let iceTimeoutId: NodeJS.Timeout;
+    let iceTimeoutId: NodeJS.Timeout | null = null;
 
     const pc = new RTCPeerConnection({ 
       iceServers: [] // OpenAI handles this
@@ -609,7 +611,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
    *
    * @param sessionId - The unique identifier of the session to close.
    */
-  const closeSession = (sessionId: string): void => {
+  const closeSession = (
+    sessionId: string,
+    options: SessionCloseOptions = { removeAfterConnectionClose: true }
+  ): void => {
     const session = getSessionById(sessionId);
     if (!session) {
       console.warn(`Session with ID '${sessionId}' does not exist.`);
@@ -625,6 +630,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     const endTimeMs = new Date(endTime).getTime();
     const duration = startTimeMs ? (endTimeMs - startTimeMs) / 1000 : 0;
 
+    // Update session state
     dispatch({
       type: SessionActionType.UPDATE_SESSION,
       payload: {
@@ -636,8 +642,18 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       },
     });
 
+    // Only remove the session if explicitly requested
+    if (options.removeAfterConnectionClose) {
+      dispatch({
+        type: SessionActionType.REMOVE_SESSION,
+        payload: { id: sessionId },
+      });
+    }
+
     console.log(
-      `Session '${sessionId}' connection closed. Duration: ${duration}s`
+      `Session '${sessionId}' connection closed. Duration: ${duration}s. Session ${
+        options.removeAfterConnectionClose ? 'removed from' : 'kept in'
+      } state.`
     );
   };
 

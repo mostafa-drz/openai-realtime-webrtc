@@ -1038,3 +1038,15 @@ export type StartSession = (
   realtimeSession: RealtimeSession,
   functionCallHandler?: FunctionCallHandler
 ) => void;
+
+/**
+ * Options for closing a WebRTC session.
+ */
+export interface SessionCloseOptions {
+  /**
+   * Whether to remove the session from state after closing the connection.
+   * Set to false to keep the session data for analytics or other purposes.
+   * @default true
+   */
+  removeAfterConnectionClose?: boolean;
+}
