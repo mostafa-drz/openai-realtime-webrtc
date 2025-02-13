@@ -400,9 +400,33 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
           }
         );
 
-        // Apply the SDP answer from the response
-        const answer = { type: 'answer' as RTCSdpType, sdp: await response.text() };
-        await pc.setRemoteDescription(answer);
+        // Try to set remote description with proper error handling
+        try {
+          const answer = { type: 'answer' as RTCSdpType, sdp: await response.text() };
+          await pc.setRemoteDescription(answer);
+        } catch (error) {
+          console.error(`Failed to set remote description for session '${sessionId}':`, error);
+          
+          dispatch({
+            type: SessionActionType.ADD_ERROR,
+            payload: {
+              sessionId,
+              error: {
+                event_id: crypto.randomUUID(),
+                type: 'webrtc_error',
+                code: 'remote_description_failed',
+                message: 'Failed to set remote description',
+                param: null,
+                related_event_id: null,
+                timestamp: Date.now(),
+              },
+            },
+          });
+          
+          // Clean up resources since we couldn't establish the connection
+          cleanupWebRTCResources(realtimeSession);
+          throw error; // Re-throw to handle at higher level
+        }
         
         console.log(`Renegotiation completed for session '${sessionId}'`);
       } catch (error) {
