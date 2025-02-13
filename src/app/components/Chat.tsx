@@ -53,6 +53,7 @@ const Chat: React.FC = () => {
     `,
     turn_detection: defaultTurnDetection,
     tools,
+    connection_timeout: 3000,
   });
 
   const {

@@ -865,7 +865,7 @@ export interface RealtimeSession {
   /**
    * List of errors that have occurred during this session.
    * This array is updated whenever an error event is received.
-   */
+   */   
   errors?: SessionError[];
   /**
    * Tracks token usage statistics for the session.
@@ -891,38 +891,27 @@ export interface RealtimeSession {
    * Calculated as the difference between endTime and startTime
    */
   duration?: number;
+
+  /**
+   * Timeout in milliseconds for ICE connection.
+   * @default 10000
+   */
+  connection_timeout: number;
 }
+
+type OpenAICreateSessionParams = Pick<RealtimeSession, 'modalities' | 'instructions' | 'tools' | 'turn_detection' | 'input_audio_transcription' | 'voice' | 'output_audio_format' | 'temperature' | 'max_response_output_tokens'
+>;
 
 /**
  * Type definition for the request body to create a new session in the OpenAI Realtime API.
  */
-export interface SessionConfig
-  extends Partial<Omit<RealtimeSession, 'id' | 'object' | 'clientSecret'>> {
+export interface SessionConfig extends OpenAICreateSessionParams {
   /**
-   * The Realtime model to use for this session (e.g., GPT-4 Realtime Preview).
-   * This is optional during session creation.
+   * Optional timeout in milliseconds for ICE connection.
+   * Defaults to 10000 (10 seconds) if not specified.
    */
-  model?: string;
-
-  /**
-   * The modalities the model should respond with (e.g., `["text", "audio"]`).
-   */
-  modalities?: Modality[];
-
-  /**
-   * Default system instructions (system message) to guide model behavior.
-   */
-  instructions?: string;
-
-  /**
-   * Optional list of tools (functions) available to the model.
-   */
-  tools?: Tool[];
-
-  /**
-   * Optional turn detection configuration for managing user interaction.
-   */
-  turn_detection?: TurnDetectionConfig | null;
+  connection_timeout?: number;
+  model?: null;
 }
 
 /**
