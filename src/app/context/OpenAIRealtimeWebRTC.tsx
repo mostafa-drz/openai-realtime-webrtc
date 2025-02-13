@@ -27,6 +27,7 @@ import {
   StartSession,
   SessionError,
 } from '../types';
+import { WebRTC } from '../utils/constants';
 
 /**
  * Context type definition for managing OpenAI Realtime WebRTC sessions.
@@ -376,6 +377,30 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       iceServers: [] // OpenAI handles this
     });
 
+    // Use constant from utils
+    const timeoutDuration = realtimeSession.connection_timeout ?? WebRTC.DEFAULT_CONNECTION_TIMEOUT;
+    const iceTimeoutId = setTimeout(() => {
+      if (pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') {
+        console.error(`ICE connection timeout (${timeoutDuration}ms) for session '${sessionId}'`);
+        dispatch({
+          type: SessionActionType.ADD_ERROR,
+          payload: {
+            sessionId,
+            error: {
+              event_id: crypto.randomUUID(),
+              type: 'webrtc_error',
+              code: 'ice_connection_timeout',
+              message: `ICE connection timed out after ${timeoutDuration}ms`,
+              param: null,
+              related_event_id: null,
+              timestamp: Date.now(),
+            },
+          },
+        });
+        cleanupWebRTCResources(realtimeSession);
+      }
+    }, timeoutDuration);
+
     // Add negotiation handling
     pc.onnegotiationneeded = async () => {
       try {
@@ -451,11 +476,13 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       }
     };
 
-    // Setup connection state monitoring
+    // Update existing connection state handler to clear timeout
     pc.oniceconnectionstatechange = () => {
-      if (
-        ['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)
-      ) {
+      if (['connected', 'completed'].includes(pc.iceConnectionState)) {
+        clearTimeout(iceTimeoutId);
+      }
+      if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
+        clearTimeout(iceTimeoutId);
         dispatch({
           type: SessionActionType.UPDATE_SESSION,
           payload: {

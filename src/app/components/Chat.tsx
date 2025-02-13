@@ -12,6 +12,7 @@ import {
   TurnDetectionType,
   RealtimeEventType,
   Voice,
+  OpenAICreateSessionParams,
 } from '../types';
 import tools from './openAITools';
 import Transcripts from './Transcripts';
@@ -39,21 +40,25 @@ const defaultTurnDetection: TurnDetectionConfig = {
   silence_duration_ms: 500,
 };
 
+const openAICreateSessionParams: OpenAICreateSessionParams = {
+  modalities: [Modality.TEXT, Modality.AUDIO],
+  input_audio_transcription: {
+    model: 'whisper-1',
+  },
+  voice: Voice.ALLOY,
+  instructions: `
+    You are a fortune teller. You can see the future.
+  `,
+  turn_detection: defaultTurnDetection,
+  tools,
+};
+
 const Chat: React.FC = () => {
   const [mode, setMode] = useState<'vad' | 'push-to-talk'>('vad');
   const [selectedVoice, setSelectedVoice] = useState<VoiceId>('alloy');
   const [config, setConfig] = useState<SessionConfig>({
-    modalities: [Modality.TEXT, Modality.AUDIO],
-    input_audio_transcription: {
-      model: 'whisper-1',
-    },
-    voice: selectedVoice as Voice, // Add voice configuration
-    instructions: `
-      You are a fortune teller. You can see the future.
-    `,
-    turn_detection: defaultTurnDetection,
-    tools,
-    connection_timeout: 3000,
+    ...openAICreateSessionParams,
+    connection_timeout: 10000,
   });
 
   const {
@@ -69,7 +74,7 @@ const Chat: React.FC = () => {
     unmuteSessionAudio,
   } = useSession();
 
-  async function createNewSession(updatedConfig: SessionConfig) {
+  async function createNewOpenAISession(updatedConfig: OpenAICreateSessionParams) {
     const session = await (
       await fetch('/api/session', {
         method: 'POST',
@@ -80,8 +85,9 @@ const Chat: React.FC = () => {
   }
 
   async function onSessionStart() {
-    const newSession = await createNewSession(config);
-    startSession({ ...newSession }, handleFunctionCall);
+    const {connection_timeout, ...rest} = config
+    const newSession = await createNewOpenAISession(rest);
+    startSession({ ...newSession, connection_timeout }, handleFunctionCall);
   }
 
   const handleModeChange = (newMode: 'vad' | 'push-to-talk') => {

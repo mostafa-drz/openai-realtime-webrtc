@@ -899,7 +899,7 @@ export interface RealtimeSession {
   connection_timeout: number;
 }
 
-type OpenAICreateSessionParams = Pick<RealtimeSession, 'modalities' | 'instructions' | 'tools' | 'turn_detection' | 'input_audio_transcription' | 'voice' | 'output_audio_format' | 'temperature' | 'max_response_output_tokens'
+export type OpenAICreateSessionParams = Pick<RealtimeSession, 'modalities' | 'instructions' | 'tools' | 'turn_detection' | 'input_audio_transcription' | 'voice' | 'output_audio_format' | 'temperature' | 'max_response_output_tokens'
 >;
 
 /**
