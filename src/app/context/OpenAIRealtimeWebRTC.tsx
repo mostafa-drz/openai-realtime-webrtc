@@ -372,109 +372,34 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     functionCallHandler?: (name: string, args: Record<string, unknown>) => void
   ): Promise<void> => {
     const sessionId = realtimeSession.id;
+    let iceTimeoutId: NodeJS.Timeout;
 
     const pc = new RTCPeerConnection({ 
       iceServers: [] // OpenAI handles this
     });
 
-    // Use constant from utils
-    const timeoutDuration = realtimeSession.connection_timeout ?? WebRTC.DEFAULT_CONNECTION_TIMEOUT;
-    const iceTimeoutId = setTimeout(() => {
-      if (pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') {
-        console.error(`ICE connection timeout (${timeoutDuration}ms) for session '${sessionId}'`);
-        dispatch({
-          type: SessionActionType.ADD_ERROR,
-          payload: {
-            sessionId,
-            error: {
-              event_id: crypto.randomUUID(),
-              type: 'webrtc_error',
-              code: 'ice_connection_timeout',
-              message: `ICE connection timed out after ${timeoutDuration}ms`,
-              param: null,
-              related_event_id: null,
-              timestamp: Date.now(),
-            },
-          },
-        });
-        cleanupWebRTCResources(realtimeSession);
-      }
-    }, timeoutDuration);
+    // Create an audio transceiver BEFORE creating the offer
+    pc.addTransceiver('audio', {
+      direction: 'sendrecv',
+      streams: [new MediaStream()]
+    });
 
-    // Add negotiation handling
-    pc.onnegotiationneeded = async () => {
-      try {
-        console.log(`Negotiation needed for session '${sessionId}'`);
-        
-        // Create a new offer
-        const offer = await pc.createOffer();
-        
-        // Set it as local description
-        await pc.setLocalDescription(offer);
-        
-        // Send the offer to OpenAI's servers
-        const response = await fetch(
-          `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
-          {
-            method: 'POST',
-            body: offer.sdp,
-            headers: {
-              Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
-              'Content-Type': 'application/sdp',
-            },
-          }
-        );
+    // Create data channel
+    const dc = pc.createDataChannel(sessionId);
 
-        // Try to set remote description with proper error handling
-        try {
-          const answer = { type: 'answer' as RTCSdpType, sdp: await response.text() };
-          await pc.setRemoteDescription(answer);
-        } catch (error) {
-          console.error(`Failed to set remote description for session '${sessionId}':`, error);
-          
-          dispatch({
-            type: SessionActionType.ADD_ERROR,
-            payload: {
-              sessionId,
-              error: {
-                event_id: crypto.randomUUID(),
-                type: 'webrtc_error',
-                code: 'remote_description_failed',
-                message: 'Failed to set remote description',
-                param: null,
-                related_event_id: null,
-                timestamp: Date.now(),
-              },
-            },
-          });
-          
-          // Clean up resources since we couldn't establish the connection
-          cleanupWebRTCResources(realtimeSession);
-          throw error; // Re-throw to handle at higher level
-        }
-        
-        console.log(`Renegotiation completed for session '${sessionId}'`);
-      } catch (error) {
-        console.error(`Failed to renegotiate session '${sessionId}':`, error);
-        
-        // Add error to session state
-        dispatch({
-          type: SessionActionType.ADD_ERROR,
-          payload: {
-            sessionId,
-            error: {
-              event_id: crypto.randomUUID(),
-              type: 'negotiation_error',
-              code: 'negotiation_failed',
-              message: 'Failed to renegotiate WebRTC connection',
-              param: null,
-              related_event_id: null,
-              timestamp: Date.now(),
-            },
-          },
-        });
-      }
-    };
+    // Add session to state
+    dispatch({
+      type: SessionActionType.ADD_SESSION,
+      payload: {
+        ...realtimeSession,
+        peerConnection: pc,
+        dataChannel: dc,
+        tokenRef: realtimeSession?.client_secret?.value,
+        isConnecting: true,
+        isConnected: false,
+        startTime: new Date().toISOString(),
+      } as RealtimeSession,
+    });
 
     // Update existing connection state handler to clear timeout
     pc.oniceconnectionstatechange = () => {
@@ -492,6 +417,52 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
           },
         });
         cleanupWebRTCResources(getSessionById(sessionId));
+      }
+    };
+
+    pc.onnegotiationneeded = async () => {
+      try {
+        console.log(`Negotiation needed for session '${sessionId}'`);
+        
+        // Create offer with explicit audio
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,  // Explicitly request audio
+        });
+        
+        console.log('Generated offer SDP:', offer.sdp); // Debug log
+        
+        await pc.setLocalDescription(offer);
+        
+        const response = await fetch(
+          `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+          {
+            method: 'POST',
+            body: offer.sdp,
+            headers: {
+              Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
+              'Content-Type': 'application/sdp',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('OpenAI API error:', errorText);
+          throw new Error(errorText);
+        }
+
+        const answerSdp = await response.text();
+        console.log('Received answer SDP:', answerSdp); // Debug log
+
+        await pc.setRemoteDescription(new RTCSessionDescription({
+          type: 'answer',
+          sdp: answerSdp
+        }));
+        
+        console.log(`Negotiation completed for session '${sessionId}'`);
+      } catch (error) {
+        console.error(`Failed to negotiate session '${sessionId}':`, error);
+        // ... error handling ...
       }
     };
 
@@ -513,23 +484,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         },
       });
     };
-
-    // Create and manage a data channel
-    const dc = pc.createDataChannel(sessionId);
-
-    // Add a temporary session to state with start time
-    dispatch({
-      type: SessionActionType.ADD_SESSION,
-      payload: {
-        ...realtimeSession,
-        peerConnection: pc,
-        dataChannel: dc,
-        tokenRef: realtimeSession?.client_secret?.value,
-        isConnecting: true,
-        isConnected: false,
-        startTime: new Date().toISOString(), // Add start time
-      } as RealtimeSession,
-    });
 
     // Add event listeners to handle data channel lifecycle
     dc.addEventListener('open', () => {
