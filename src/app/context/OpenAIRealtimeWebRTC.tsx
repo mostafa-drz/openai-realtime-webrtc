@@ -1,9 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useState,
+  useEffect,
+} from 'react';
 import {
   Transcript,
-  Modality,
   RealtimeSession,
   RealtimeEventType,
   TranscriptType,
@@ -366,30 +371,47 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     functionCallHandler?: (name: string, args: Record<string, unknown>) => void
   ): Promise<void> => {
     const sessionId = realtimeSession.id;
-    // Create a new peer connection
-    const pc = new RTCPeerConnection();
 
-    // Attach local audio stream if AUDIO modality is enabled
-    if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
-      const localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-      localStream
-        .getAudioTracks()
-        .forEach((track) => pc.addTrack(track, localStream));
-      // Manage the remote stream
-      pc.ontrack = (event) => {
-        console.log(`Remote stream received for session '${sessionId}'.`);
-        // update the state for this session with event.streams[0] as mediaStream
+    // Create a new peer connection with unified-plan semantics
+    const pc = new RTCPeerConnection({
+      iceServers: [], // OpenAI handles this
+    });
+
+    // Setup connection state monitoring
+    pc.oniceconnectionstatechange = () => {
+      if (
+        ['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)
+      ) {
         dispatch({
           type: SessionActionType.UPDATE_SESSION,
           payload: {
             id: sessionId,
-            mediaStream: event.streams[0],
+            isConnecting: false,
+            isConnected: false,
           },
         });
+        cleanupWebRTCResources(getSessionById(sessionId));
+      }
+    };
+
+    // Handle tracks with cleanup
+    pc.ontrack = (event) => {
+      console.log(`Remote stream received for session '${sessionId}'.`);
+      event.track.onended = () => {
+        const session = getSessionById(sessionId);
+        if (session) {
+          cleanupWebRTCResources(session);
+        }
       };
-    }
+
+      dispatch({
+        type: SessionActionType.UPDATE_SESSION,
+        payload: {
+          id: sessionId,
+          mediaStream: event.streams[0],
+        },
+      });
+    };
 
     // Create and manage a data channel
     const dc = pc.createDataChannel(sessionId);
@@ -548,45 +570,35 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
    * @param sessionId - The unique identifier of the session to close.
    */
   const closeSession = (sessionId: string): void => {
-    // Find the session by ID
-    const session = sessions.find((s) => s.id === sessionId);
-
+    const session = getSessionById(sessionId);
     if (!session) {
       console.warn(`Session with ID '${sessionId}' does not exist.`);
       return;
     }
 
-    // Close the data channel if it exists
-    if (session.dataChannel) {
-      session.dataChannel.close();
-      console.log(`Data channel for session '${sessionId}' closed.`);
-    }
-
-    // Close the peer connection if it exists
-    if (session.peer_connection) {
-      session.peer_connection.close();
-      console.log(`Peer connection for session '${sessionId}' closed.`);
-    }
+    cleanupWebRTCResources(session);
 
     const endTime = new Date().toISOString();
-    const startTimeMs = session.startTime ? new Date(session.startTime).getTime() : 0;
+    const startTimeMs = session.startTime
+      ? new Date(session.startTime).getTime()
+      : 0;
     const endTimeMs = new Date(endTime).getTime();
     const duration = startTimeMs ? (endTimeMs - startTimeMs) / 1000 : 0;
 
-    // Update the session status with timing information
     dispatch({
       type: SessionActionType.UPDATE_SESSION,
       payload: {
         id: sessionId,
         isConnecting: false,
         isConnected: false,
-        dataChannel: null,
-        peer_connection: null,
         endTime,
         duration,
       },
     });
-    console.log(`Session '${sessionId}' connection closed. Duration: ${duration}s`);
+
+    console.log(
+      `Session '${sessionId}' connection closed. Duration: ${duration}s`
+    );
   };
 
   /**
@@ -716,6 +728,66 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       payload: { sessionId },
     });
   };
+
+  /**
+   * Utility function to properly cleanup WebRTC resources
+   */
+  const cleanupWebRTCResources = (session: RealtimeSession | null) => {
+    if (!session) return;
+
+    // Cleanup media tracks
+    if (session.mediaStream) {
+      session.mediaStream.getTracks().forEach((track) => {
+        track.stop();
+        track.dispatchEvent(new Event('ended'));
+      });
+    }
+
+    // Cleanup data channel
+    if (session.dataChannel) {
+      session.dataChannel.onmessage = null;
+      session.dataChannel.onopen = null;
+      session.dataChannel.onclose = null;
+      session.dataChannel.onerror = null;
+      if (session.dataChannel.readyState !== 'closed') {
+        session.dataChannel.close();
+      }
+    }
+
+    // Cleanup peer connection
+    if (session.peer_connection) {
+      // Remove all event listeners
+      session.peer_connection.onicecandidate = null;
+      session.peer_connection.ontrack = null;
+      session.peer_connection.oniceconnectionstatechange = null;
+      session.peer_connection.onsignalingstatechange = null;
+      session.peer_connection.ondatachannel = null;
+
+      // Close the connection if not already closed
+      if (session.peer_connection.signalingState !== 'closed') {
+        session.peer_connection.close();
+      }
+    }
+
+    // Clear references
+    session.mediaStream = null;
+    session.dataChannel = null;
+    session.peer_connection = null;
+  };
+
+  // Handle cleanup on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      sessions.forEach((session) => {
+        cleanupWebRTCResources(session);
+      });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sessions]);
 
   return (
     <OpenAIRealtimeWebRTCContext.Provider
