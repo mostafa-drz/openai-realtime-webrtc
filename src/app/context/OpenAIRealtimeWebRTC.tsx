@@ -341,7 +341,8 @@ export const useSession = (id?: string | undefined) => {
 
   return {
     session,
-    closeSession: (options?: SessionCloseOptions) => closeSession(sessionId, options),
+    closeSession: (options?: SessionCloseOptions) =>
+      closeSession(sessionId, options),
     sendTextMessage: (message: string) => sendTextMessage(sessionId, message),
     sendClientEvent: (event: RealtimeEvent) =>
       sendClientEvent(sessionId, event),
@@ -376,16 +377,30 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     const sessionId = realtimeSession.id;
     let iceTimeoutId: NodeJS.Timeout | null = null;
 
-    const pc = new RTCPeerConnection({ 
-      iceServers: [] // OpenAI handles this
+    const pc = new RTCPeerConnection({
+      iceServers: [], // OpenAI handles this
     });
+
+    // Set ICE connection timeout
+    iceTimeoutId = setTimeout(() => {
+      console.error(`ICE connection timeout for session '${sessionId}'`);
+      cleanupWebRTCResources(getSessionById(sessionId));
+      dispatch({
+        type: SessionActionType.UPDATE_SESSION,
+        payload: {
+          id: sessionId,
+          isConnecting: false,
+          isConnected: false,
+        },
+      });
+    }, 30000); // 30 second timeout
 
     // Get user media before creating transceiver
     if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
       const localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
       });
-      
+
       // Add tracks to peer connection
       localStream.getAudioTracks().forEach((track) => {
         pc.addTrack(track, localStream);
@@ -412,10 +427,12 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     // Update existing connection state handler to clear timeout
     pc.oniceconnectionstatechange = () => {
       if (['connected', 'completed'].includes(pc.iceConnectionState)) {
-        clearTimeout(iceTimeoutId);
+        if (iceTimeoutId) clearTimeout(iceTimeoutId);
       }
-      if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
-        clearTimeout(iceTimeoutId);
+      if (
+        ['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)
+      ) {
+        if (iceTimeoutId) clearTimeout(iceTimeoutId);
         dispatch({
           type: SessionActionType.UPDATE_SESSION,
           payload: {
@@ -431,16 +448,16 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     pc.onnegotiationneeded = async () => {
       try {
         console.log(`Negotiation needed for session '${sessionId}'`);
-        
+
         // Create offer with explicit audio
         const offer = await pc.createOffer({
-          offerToReceiveAudio: true,  // Explicitly request audio
+          offerToReceiveAudio: true, // Explicitly request audio
         });
-        
+
         console.log('Generated offer SDP:', offer.sdp); // Debug log
-        
+
         await pc.setLocalDescription(offer);
-        
+
         const response = await fetch(
           `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
           {
@@ -462,11 +479,13 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         const answerSdp = await response.text();
         console.log('Received answer SDP:', answerSdp); // Debug log
 
-        await pc.setRemoteDescription(new RTCSessionDescription({
-          type: 'answer',
-          sdp: answerSdp
-        }));
-        
+        await pc.setRemoteDescription(
+          new RTCSessionDescription({
+            type: 'answer',
+            sdp: answerSdp,
+          })
+        );
+
         console.log(`Negotiation completed for session '${sessionId}'`);
       } catch (error) {
         console.error(`Failed to negotiate session '${sessionId}':`, error);
