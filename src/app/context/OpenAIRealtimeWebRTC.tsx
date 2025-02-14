@@ -569,7 +569,9 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     }
 
     const endTime = new Date().toISOString();
-    const startTimeMs = session.startTime ? new Date(session.startTime).getTime() : 0;
+    const startTimeMs = session.startTime
+      ? new Date(session.startTime).getTime()
+      : 0;
     const endTimeMs = new Date(endTime).getTime();
     const duration = startTimeMs ? (endTimeMs - startTimeMs) / 1000 : 0;
 
@@ -586,7 +588,9 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         duration,
       },
     });
-    console.log(`Session '${sessionId}' connection closed. Duration: ${duration}s`);
+    console.log(
+      `Session '${sessionId}' connection closed. Duration: ${duration}s`
+    );
   };
 
   /**

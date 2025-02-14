@@ -6,7 +6,11 @@ interface SessionInfoProps {
   duration?: number;
 }
 
-const SessionInfo: React.FC<SessionInfoProps> = ({ startTime, endTime, duration }) => {
+const SessionInfo: React.FC<SessionInfoProps> = ({
+  startTime,
+  endTime,
+  duration,
+}) => {
   const formatDateTime = (isoString?: string) => {
     if (!isoString) return 'Not set';
     return new Date(isoString).toLocaleString();
@@ -16,7 +20,9 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ startTime, endTime, duration 
     if (!seconds) return '0s';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
-    return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
+    return minutes > 0
+      ? `${minutes}m ${remainingSeconds}s`
+      : `${remainingSeconds}s`;
   };
 
   return (
@@ -38,4 +44,4 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ startTime, endTime, duration 
   );
 };
 
-export default SessionInfo; 
+export default SessionInfo;

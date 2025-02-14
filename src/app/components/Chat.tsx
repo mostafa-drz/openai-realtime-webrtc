@@ -167,7 +167,7 @@ const Chat: React.FC = () => {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">AI Chat</h1>
-          
+
           {/* Session Control */}
           {session?.isConnected ? (
             <button
@@ -202,7 +202,9 @@ const Chat: React.FC = () => {
 
           <select
             value={mode}
-            onChange={(e) => handleModeChange(e.target.value as 'vad' | 'push-to-talk')}
+            onChange={(e) =>
+              handleModeChange(e.target.value as 'vad' | 'push-to-talk')
+            }
             className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
           >
             <option value="vad">VAD</option>
@@ -299,7 +301,8 @@ const Chat: React.FC = () => {
                 />
               ) : (
                 <p className="text-gray-600 text-sm italic">
-                  Voice Activity Detection (VAD) mode enabled. Start speaking to interact.
+                  Voice Activity Detection (VAD) mode enabled. Start speaking to
+                  interact.
                 </p>
               )}
             </div>
