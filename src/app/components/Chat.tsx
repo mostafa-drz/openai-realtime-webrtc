@@ -75,7 +75,9 @@ const Chat: React.FC = () => {
     unmuteSessionAudio,
   } = useSession();
 
-  async function createNewOpenAISession(updatedConfig: OpenAICreateSessionParams) {
+  async function createNewOpenAISession(
+    updatedConfig: OpenAICreateSessionParams
+  ) {
     const session = await (
       await fetch('/api/session', {
         method: 'POST',
@@ -86,7 +88,7 @@ const Chat: React.FC = () => {
   }
 
   async function onSessionStart() {
-    const {connection_timeout, ...rest} = config
+    const { connection_timeout, ...rest } = config;
     const newSession = await createNewOpenAISession(rest);
     startSession({ ...newSession, connection_timeout }, handleFunctionCall);
   }

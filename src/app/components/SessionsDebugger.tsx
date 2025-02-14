@@ -1,11 +1,8 @@
 'use client';
 
 import React from 'react';
-import dynamic from 'next/dynamic';
 import { useOpenAIRealtimeWebRTC } from '../context/OpenAIRealtimeWebRTC';
-
-// Dynamically import react-json-view to avoid SSR issues
-const ReactJson = dynamic(() => import('react-json-view'), { ssr: false });
+import { JsonViewer } from '@textea/json-viewer';
 
 const SessionsDebugger: React.FC = () => {
   const { sessions } = useOpenAIRealtimeWebRTC();
@@ -20,17 +17,14 @@ const SessionsDebugger: React.FC = () => {
 
   return (
     <div className="p-4 bg-white rounded-lg shadow">
-      <h2 className="text-lg font-bold mb-4">Sessions Debugger ({sessions.length})</h2>
+      <h2 className="text-lg font-bold mb-4">
+        Sessions Debugger ({sessions.length})
+      </h2>
       <div className="space-y-4">
         {sessions.map((session) => (
-          <div
-            key={session.id}
-            className="border rounded-lg p-4 bg-gray-50"
-          >
+          <div key={session.id} className="border rounded-lg p-4 bg-gray-50">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium">
-                Session ID: {session.id}
-              </h3>
+              <h3 className="font-medium">Session ID: {session.id}</h3>
               <span
                 className={`px-2 py-1 rounded-full text-sm ${
                   session.isConnected
@@ -42,16 +36,15 @@ const SessionsDebugger: React.FC = () => {
               </span>
             </div>
             <div className="mt-2 overflow-auto max-h-96">
-              <ReactJson
-                src={session}
-                name={null}
-                theme="rjv-default"
-                collapsed={2}
+              <JsonViewer
+                value={session}
+                defaultInspectDepth={2}
+                theme="light"
                 displayDataTypes={false}
                 enableClipboard={true}
-                style={{ 
+                style={{
                   backgroundColor: 'transparent',
-                  padding: '8px'
+                  padding: '8px',
                 }}
               />
             </div>
@@ -62,4 +55,4 @@ const SessionsDebugger: React.FC = () => {
   );
 };
 
-export default SessionsDebugger; 
+export default SessionsDebugger;

@@ -865,7 +865,7 @@ export interface RealtimeSession {
   /**
    * List of errors that have occurred during this session.
    * This array is updated whenever an error event is received.
-   */   
+   */
   errors?: SessionError[];
   /**
    * Tracks token usage statistics for the session.
@@ -899,7 +899,17 @@ export interface RealtimeSession {
   connection_timeout: number;
 }
 
-export type OpenAICreateSessionParams = Pick<RealtimeSession, 'modalities' | 'instructions' | 'tools' | 'turn_detection' | 'input_audio_transcription' | 'voice' | 'output_audio_format' | 'temperature' | 'max_response_output_tokens'
+export type OpenAICreateSessionParams = Pick<
+  RealtimeSession,
+  | 'modalities'
+  | 'instructions'
+  | 'tools'
+  | 'turn_detection'
+  | 'input_audio_transcription'
+  | 'voice'
+  | 'output_audio_format'
+  | 'temperature'
+  | 'max_response_output_tokens'
 >;
 
 /**

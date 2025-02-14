@@ -7,4 +7,4 @@ export const WebRTC = {
    * Connection attempts will be aborted if not established within this time.
    */
   DEFAULT_CONNECTION_TIMEOUT: 10000, // 10 seconds
-} as const; 
+} as const;

@@ -16,10 +16,10 @@
     "check-all": "npm run ts:check && npm run lint && npm run format:check"
   },
   "dependencies": {
+    "@textea/json-viewer": "^4.0.1",
     "next": "^14.1.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-json-view": "^1.21.3"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.0.0",
