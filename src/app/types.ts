@@ -907,6 +907,17 @@ export interface RealtimeSession {
    * Timestamp of the last connection state change
    */
   lastStateChange?: string;
+
+  /**
+   * Custom audio settings for the session.
+   * Allows developers to specify their own settings for audio input.
+   */
+  audioSettings?: AudioSettings;
+
+  /**
+   * Indicates whether the session currently has an active audio track.
+   */
+  hasAudio?: boolean;
 }
 
 export type OpenAICreateSessionParams = Pick<
@@ -1103,4 +1114,15 @@ export enum WebRTCErrorCode {
   DATA_CHANNEL_FAILED = 'data_channel_failed',
   MEDIA_ACCESS_DENIED = 'media_access_denied',
   SIGNALING_FAILED = 'signaling_failed',
+}
+
+/**
+ * Custom audio settings for the session.
+ * Allows developers to specify their own settings for audio input.
+ */
+export interface AudioSettings {
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
+  sampleRate?: number;
 }

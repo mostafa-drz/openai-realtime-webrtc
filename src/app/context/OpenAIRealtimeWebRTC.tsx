@@ -29,6 +29,7 @@ import {
   Modality,
   SessionCloseOptions,
   ConnectionStatus,
+  AudioSettings,
 } from '../types';
 
 /**
@@ -371,7 +372,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     return sessions.find((session) => session.id === sessionId) || null;
   };
 
-  const startSession = async (
+  const startSession: StartSession = async (
     realtimeSession: RealtimeSession,
     functionCallHandler?: (name: string, args: Record<string, unknown>) => void
   ): Promise<void> => {
@@ -382,6 +383,53 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       const pc = new RTCPeerConnection({
         iceServers: [], // OpenAI handles this
       });
+
+      // Use custom audio settings if provided, otherwise use defaults
+      const defaultAudioSettings: AudioSettings = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000, // Optimal for speech
+      };
+
+      const audioSettings =
+        realtimeSession.audioSettings || defaultAudioSettings;
+
+      // Get user media if audio modality is required
+      let localStream: MediaStream | undefined;
+      if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            audio: audioSettings,
+          });
+          localStream.getAudioTracks().forEach((track) => {
+            if (localStream) {
+              pc.addTrack(track, localStream);
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  hasAudio: true,
+                },
+              });
+            }
+            // Monitor track status
+            track.onended = () => {
+              console.log('Audio track ended');
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  hasAudio: false,
+                },
+              });
+            };
+          });
+        } catch (error) {
+          console.error('Failed to get user media:', error);
+          throw new Error('Microphone access failed');
+        }
+      }
 
       // Add connection state monitoring
       const monitorConnectionState = (pc: RTCPeerConnection) => {
@@ -512,18 +560,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
 
       // Initialize peer connection with monitoring
       monitorConnectionState(pc);
-
-      // Get user media before creating transceiver
-      if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
-        const localStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-
-        // Add tracks to peer connection
-        localStream.getAudioTracks().forEach((track) => {
-          pc.addTrack(track, localStream);
-        });
-      }
 
       // Create data channel
       const dc = pc.createDataChannel(sessionId);
