@@ -891,38 +891,58 @@ export interface RealtimeSession {
    * Calculated as the difference between endTime and startTime
    */
   duration?: number;
+
+  /**
+   * Timeout in milliseconds for ICE connection.
+   * @default 10000
+   */
+  connection_timeout: number;
+
+  /**
+   * Current connection status of the session
+   */
+  connectionStatus?: ConnectionStatus;
+
+  /**
+   * Timestamp of the last connection state change
+   */
+  lastStateChange?: string;
+
+  /**
+   * Custom audio settings for the session.
+   * Allows developers to specify their own settings for audio input.
+   */
+  audioSettings?: AudioSettings;
+
+  /**
+   * Indicates whether the session currently has an active audio track.
+   */
+  hasAudio?: boolean;
 }
+
+export type OpenAICreateSessionParams = Pick<
+  RealtimeSession,
+  | 'modalities'
+  | 'instructions'
+  | 'tools'
+  | 'turn_detection'
+  | 'input_audio_transcription'
+  | 'voice'
+  | 'output_audio_format'
+  | 'temperature'
+  | 'max_response_output_tokens'
+>;
 
 /**
  * Type definition for the request body to create a new session in the OpenAI Realtime API.
  */
-export interface SessionConfig
-  extends Partial<Omit<RealtimeSession, 'id' | 'object' | 'clientSecret'>> {
+export interface SessionConfig extends OpenAICreateSessionParams {
   /**
-   * The Realtime model to use for this session (e.g., GPT-4 Realtime Preview).
-   * This is optional during session creation.
+   * Optional timeout in milliseconds for ICE connection.
+   * Defaults to 10000 (10 seconds) if not specified.
    */
-  model?: string;
-
-  /**
-   * The modalities the model should respond with (e.g., `["text", "audio"]`).
-   */
-  modalities?: Modality[];
-
-  /**
-   * Default system instructions (system message) to guide model behavior.
-   */
-  instructions?: string;
-
-  /**
-   * Optional list of tools (functions) available to the model.
-   */
-  tools?: Tool[];
-
-  /**
-   * Optional turn detection configuration for managing user interaction.
-   */
-  turn_detection?: TurnDetectionConfig | null;
+  connection_timeout?: number;
+  model?: null;
 }
 
 /**
@@ -1049,3 +1069,61 @@ export type StartSession = (
   realtimeSession: RealtimeSession,
   functionCallHandler?: FunctionCallHandler
 ) => void;
+
+/**
+ * Options for closing a WebRTC session.
+ */
+export interface SessionCloseOptions {
+  /**
+   * Whether to remove the session from state after closing the connection.
+   * Set to false to keep the session data for analytics or other purposes.
+   * @default true
+   */
+  removeAfterConnectionClose?: boolean;
+}
+
+/**
+ * Enum representing possible WebRTC connection states
+ */
+export enum ConnectionStatus {
+  INITIALIZING = 'initializing',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
+  FAILED = 'failed',
+  CLOSED = 'closed',
+  RECONNECTING = 'reconnecting',
+}
+
+/**
+ * Enum for WebRTC error types
+ */
+export enum WebRTCErrorType {
+  CONNECTION_ERROR = 'connection_error',
+  DATA_CHANNEL_ERROR = 'data_channel_error',
+  MEDIA_ERROR = 'media_error',
+  SIGNALING_ERROR = 'signaling_error',
+  UNKNOWN_ERROR = 'unknown_error',
+}
+
+/**
+ * Enum for specific WebRTC error codes
+ */
+export enum WebRTCErrorCode {
+  ICE_CONNECTION_FAILED = 'ice_connection_failed',
+  ICE_CONNECTION_TIMEOUT = 'ice_connection_timeout',
+  DATA_CHANNEL_FAILED = 'data_channel_failed',
+  MEDIA_ACCESS_DENIED = 'media_access_denied',
+  SIGNALING_FAILED = 'signaling_failed',
+}
+
+/**
+ * Custom audio settings for the session.
+ * Allows developers to specify their own settings for audio input.
+ */
+export interface AudioSettings {
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
+  sampleRate?: number;
+}
