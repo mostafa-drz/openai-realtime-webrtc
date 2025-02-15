@@ -431,11 +431,76 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         }
       }
 
-      // Add connection state monitoring
+      // --------------------------------------------
+      // NEW: Reconnection mechanism for ICE disconnections
+      // --------------------------------------------
+      const attemptReconnection = async (
+        pc: RTCPeerConnection
+      ): Promise<void> => {
+        console.log(`Attempting reconnection for session '${sessionId}'`);
+        try {
+          // Create an offer with ICE restart enabled
+          const offer = await pc.createOffer({
+            iceRestart: true,
+            offerToReceiveAudio: true,
+          });
+          console.log('Reconnection offer SDP:', offer.sdp);
+          await pc.setLocalDescription(offer);
+
+          const response = await fetch(
+            `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+            {
+              method: 'POST',
+              body: offer.sdp,
+              headers: {
+                Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
+                'Content-Type': 'application/sdp',
+              },
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(
+              'Reconnection failed, error from OpenAI API:',
+              errorText
+            );
+            throw new Error(errorText);
+          }
+
+          const answerSdp = await response.text();
+          await pc.setRemoteDescription(
+            new RTCSessionDescription({
+              type: 'answer',
+              sdp: answerSdp,
+            })
+          );
+          console.log(`Reconnection successful for session '${sessionId}'`);
+          // Update session state to "CONNECTED" after successful reconnection
+          dispatch({
+            type: SessionActionType.UPDATE_SESSION,
+            payload: {
+              id: sessionId,
+              isConnecting: false,
+              isConnected: true,
+              connectionStatus: ConnectionStatus.CONNECTED,
+              lastStateChange: new Date().toISOString(),
+            },
+          });
+        } catch (error) {
+          console.error(`Failed to reconnect session '${sessionId}':`, error);
+          // Optionally, update session state to a failed status or retain DISCONNECTED
+        }
+      };
+
+      // Enhance ICE connection monitoring with reconnection logic
       const monitorConnectionState = (pc: RTCPeerConnection) => {
         pc.oniceconnectionstatechange = () => {
           const state = pc.iceConnectionState;
-          console.log(`ICE Connection State for session ${sessionId}:`, state);
+          console.log(
+            `ICE Connection State for session '${sessionId}':`,
+            state
+          );
 
           switch (state) {
             case 'checking':
@@ -480,7 +545,23 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
                   lastStateChange: new Date().toISOString(),
                 },
               });
-              // Optional: Implement reconnection logic here
+              console.warn(
+                `Session '${sessionId}' disconnected. Attempting reconnection...`
+              );
+              // Delay before starting the reconnection to avoid immediate retry
+              setTimeout(() => {
+                dispatch({
+                  type: SessionActionType.UPDATE_SESSION,
+                  payload: {
+                    id: sessionId,
+                    isConnecting: true,
+                    isConnected: false,
+                    connectionStatus: ConnectionStatus.RECONNECTING, // using enum value here
+                    lastStateChange: new Date().toISOString(),
+                  },
+                });
+                attemptReconnection(pc);
+              }, 2000);
               break;
 
             case 'failed':
@@ -533,10 +614,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
               });
               cleanupWebRTCResources(getSessionById(sessionId));
               break;
+
+            default:
+              // Ensure exhaustive check using enums where possible
+              throw new Error(`Unhandled ICE connection state: ${state}`);
           }
         };
 
-        // Set ICE connection timeout
+        // Set ICE connection timeout remains as before
         iceTimeoutId = setTimeout(() => {
           console.error(`ICE connection timeout for session '${sessionId}'`);
           dispatch({
