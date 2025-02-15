@@ -897,6 +897,16 @@ export interface RealtimeSession {
    * @default 10000
    */
   connection_timeout: number;
+
+  /**
+   * Current connection status of the session
+   */
+  connectionStatus?: ConnectionStatus;
+
+  /**
+   * Timestamp of the last connection state change
+   */
+  lastStateChange?: string;
 }
 
 export type OpenAICreateSessionParams = Pick<
@@ -1059,4 +1069,38 @@ export interface SessionCloseOptions {
    * @default true
    */
   removeAfterConnectionClose?: boolean;
+}
+
+/**
+ * Enum representing possible WebRTC connection states
+ */
+export enum ConnectionStatus {
+  INITIALIZING = 'initializing',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
+  FAILED = 'failed',
+  CLOSED = 'closed',
+}
+
+/**
+ * Enum for WebRTC error types
+ */
+export enum WebRTCErrorType {
+  CONNECTION_ERROR = 'connection_error',
+  DATA_CHANNEL_ERROR = 'data_channel_error',
+  MEDIA_ERROR = 'media_error',
+  SIGNALING_ERROR = 'signaling_error',
+  UNKNOWN_ERROR = 'unknown_error',
+}
+
+/**
+ * Enum for specific WebRTC error codes
+ */
+export enum WebRTCErrorCode {
+  ICE_CONNECTION_FAILED = 'ice_connection_failed',
+  ICE_CONNECTION_TIMEOUT = 'ice_connection_timeout',
+  DATA_CHANNEL_FAILED = 'data_channel_failed',
+  MEDIA_ACCESS_DENIED = 'media_access_denied',
+  SIGNALING_FAILED = 'signaling_failed',
 }

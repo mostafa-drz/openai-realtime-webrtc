@@ -28,6 +28,7 @@ import {
   SessionError,
   Modality,
   SessionCloseOptions,
+  ConnectionStatus,
 } from '../types';
 
 /**
@@ -377,251 +378,356 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
     const sessionId = realtimeSession.id;
     let iceTimeoutId: NodeJS.Timeout | null = null;
 
-    const pc = new RTCPeerConnection({
-      iceServers: [], // OpenAI handles this
-    });
-
-    // Set ICE connection timeout
-    iceTimeoutId = setTimeout(() => {
-      console.error(`ICE connection timeout for session '${sessionId}'`);
-      cleanupWebRTCResources(getSessionById(sessionId));
-      dispatch({
-        type: SessionActionType.UPDATE_SESSION,
-        payload: {
-          id: sessionId,
-          isConnecting: false,
-          isConnected: false,
-        },
-      });
-    }, 30000); // 30 second timeout
-
-    // Get user media before creating transceiver
-    if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
-      const localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+    try {
+      const pc = new RTCPeerConnection({
+        iceServers: [], // OpenAI handles this
       });
 
-      // Add tracks to peer connection
-      localStream.getAudioTracks().forEach((track) => {
-        pc.addTrack(track, localStream);
-      });
-    }
+      // Add connection state monitoring
+      const monitorConnectionState = (pc: RTCPeerConnection) => {
+        pc.oniceconnectionstatechange = () => {
+          const state = pc.iceConnectionState;
+          console.log(`ICE Connection State for session ${sessionId}:`, state);
 
-    // Create data channel
-    const dc = pc.createDataChannel(sessionId);
+          switch (state) {
+            case 'checking':
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  isConnecting: true,
+                  isConnected: false,
+                  connectionStatus: ConnectionStatus.CONNECTING,
+                  lastStateChange: new Date().toISOString(),
+                },
+              });
+              break;
 
-    // Add session to state
-    dispatch({
-      type: SessionActionType.ADD_SESSION,
-      payload: {
-        ...realtimeSession,
-        peerConnection: pc,
-        dataChannel: dc,
-        tokenRef: realtimeSession?.client_secret?.value,
-        isConnecting: true,
-        isConnected: false,
-        startTime: new Date().toISOString(),
-      } as RealtimeSession,
-    });
+            case 'connected':
+            case 'completed':
+              if (iceTimeoutId) {
+                clearTimeout(iceTimeoutId);
+                iceTimeoutId = null;
+              }
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  isConnecting: false,
+                  isConnected: true,
+                  connectionStatus: ConnectionStatus.CONNECTED,
+                  lastStateChange: new Date().toISOString(),
+                },
+              });
+              break;
 
-    // Update existing connection state handler to clear timeout
-    pc.oniceconnectionstatechange = () => {
-      if (['connected', 'completed'].includes(pc.iceConnectionState)) {
-        if (iceTimeoutId) clearTimeout(iceTimeoutId);
+            case 'disconnected':
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  isConnecting: false,
+                  isConnected: false,
+                  connectionStatus: ConnectionStatus.DISCONNECTED,
+                  lastStateChange: new Date().toISOString(),
+                },
+              });
+              // Optional: Implement reconnection logic here
+              break;
+
+            case 'failed':
+              if (iceTimeoutId) {
+                clearTimeout(iceTimeoutId);
+                iceTimeoutId = null;
+              }
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  isConnecting: false,
+                  isConnected: false,
+                  connectionStatus: ConnectionStatus.FAILED,
+                  lastStateChange: new Date().toISOString(),
+                },
+              });
+              dispatch({
+                type: SessionActionType.ADD_ERROR,
+                payload: {
+                  sessionId,
+                  error: {
+                    event_id: crypto.randomUUID(),
+                    related_event_id: null,
+                    param: null,
+                    type: 'connection_error',
+                    code: 'ice_connection_failed',
+                    message: 'ICE connection failed',
+                    timestamp: Date.now(),
+                  },
+                },
+              });
+              cleanupWebRTCResources(getSessionById(sessionId));
+              break;
+
+            case 'closed':
+              if (iceTimeoutId) {
+                clearTimeout(iceTimeoutId);
+                iceTimeoutId = null;
+              }
+              dispatch({
+                type: SessionActionType.UPDATE_SESSION,
+                payload: {
+                  id: sessionId,
+                  isConnecting: false,
+                  isConnected: false,
+                  connectionStatus: ConnectionStatus.CLOSED,
+                  lastStateChange: new Date().toISOString(),
+                },
+              });
+              cleanupWebRTCResources(getSessionById(sessionId));
+              break;
+          }
+        };
+
+        // Set ICE connection timeout
+        iceTimeoutId = setTimeout(() => {
+          console.error(`ICE connection timeout for session '${sessionId}'`);
+          dispatch({
+            type: SessionActionType.ADD_ERROR,
+            payload: {
+              sessionId,
+              error: {
+                event_id: crypto.randomUUID(),
+                related_event_id: null,
+                param: null,
+                type: 'connection_error',
+                code: 'ice_connection_timeout',
+                message: 'ICE connection timed out',
+                timestamp: Date.now(),
+              },
+            },
+          });
+          cleanupWebRTCResources(getSessionById(sessionId));
+        }, 30000); // 30 second timeout
+      };
+
+      // Initialize peer connection with monitoring
+      monitorConnectionState(pc);
+
+      // Get user media before creating transceiver
+      if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
+        const localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+        // Add tracks to peer connection
+        localStream.getAudioTracks().forEach((track) => {
+          pc.addTrack(track, localStream);
+        });
       }
-      if (
-        ['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)
-      ) {
-        if (iceTimeoutId) clearTimeout(iceTimeoutId);
+
+      // Create data channel
+      const dc = pc.createDataChannel(sessionId);
+
+      // Add session to state
+      dispatch({
+        type: SessionActionType.ADD_SESSION,
+        payload: {
+          ...realtimeSession,
+          peerConnection: pc,
+          dataChannel: dc,
+          tokenRef: realtimeSession?.client_secret?.value,
+          isConnecting: true,
+          isConnected: false,
+          startTime: new Date().toISOString(),
+        } as RealtimeSession,
+      });
+
+      pc.onnegotiationneeded = async () => {
+        try {
+          console.log(`Negotiation needed for session '${sessionId}'`);
+
+          // Create offer with explicit audio
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true, // Explicitly request audio
+          });
+
+          console.log('Generated offer SDP:', offer.sdp); // Debug log
+
+          await pc.setLocalDescription(offer);
+
+          const response = await fetch(
+            `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+            {
+              method: 'POST',
+              body: offer.sdp,
+              headers: {
+                Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
+                'Content-Type': 'application/sdp',
+              },
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OpenAI API error:', errorText);
+            throw new Error(errorText);
+          }
+
+          const answerSdp = await response.text();
+          console.log('Received answer SDP:', answerSdp); // Debug log
+
+          await pc.setRemoteDescription(
+            new RTCSessionDescription({
+              type: 'answer',
+              sdp: answerSdp,
+            })
+          );
+
+          console.log(`Negotiation completed for session '${sessionId}'`);
+        } catch (error) {
+          console.error(`Failed to negotiate session '${sessionId}':`, error);
+          // ... error handling ...
+        }
+      };
+
+      // Handle tracks with cleanup
+      pc.ontrack = (event) => {
+        console.log(`Remote stream received for session '${sessionId}'.`);
+        event.track.onended = () => {
+          const session = getSessionById(sessionId);
+          if (session) {
+            cleanupWebRTCResources(session);
+          }
+        };
+
+        dispatch({
+          type: SessionActionType.UPDATE_SESSION,
+          payload: {
+            id: sessionId,
+            mediaStream: event.streams[0],
+          },
+        });
+      };
+
+      // Add event listeners to handle data channel lifecycle
+      dc.addEventListener('open', () => {
         dispatch({
           type: SessionActionType.UPDATE_SESSION,
           payload: {
             id: sessionId,
             isConnecting: false,
-            isConnected: false,
-          },
+            isConnected: true,
+          } as RealtimeSession,
         });
-        cleanupWebRTCResources(getSessionById(sessionId));
-      }
-    };
-
-    pc.onnegotiationneeded = async () => {
-      try {
-        console.log(`Negotiation needed for session '${sessionId}'`);
-
-        // Create offer with explicit audio
-        const offer = await pc.createOffer({
-          offerToReceiveAudio: true, // Explicitly request audio
-        });
-
-        console.log('Generated offer SDP:', offer.sdp); // Debug log
-
-        await pc.setLocalDescription(offer);
-
-        const response = await fetch(
-          `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
-          {
-            method: 'POST',
-            body: offer.sdp,
-            headers: {
-              Authorization: `Bearer ${realtimeSession.client_secret?.value}`,
-              'Content-Type': 'application/sdp',
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('OpenAI API error:', errorText);
-          throw new Error(errorText);
-        }
-
-        const answerSdp = await response.text();
-        console.log('Received answer SDP:', answerSdp); // Debug log
-
-        await pc.setRemoteDescription(
-          new RTCSessionDescription({
-            type: 'answer',
-            sdp: answerSdp,
-          })
-        );
-
-        console.log(`Negotiation completed for session '${sessionId}'`);
-      } catch (error) {
-        console.error(`Failed to negotiate session '${sessionId}':`, error);
-        // ... error handling ...
-      }
-    };
-
-    // Handle tracks with cleanup
-    pc.ontrack = (event) => {
-      console.log(`Remote stream received for session '${sessionId}'.`);
-      event.track.onended = () => {
-        const session = getSessionById(sessionId);
-        if (session) {
-          cleanupWebRTCResources(session);
-        }
-      };
-
-      dispatch({
-        type: SessionActionType.UPDATE_SESSION,
-        payload: {
-          id: sessionId,
-          mediaStream: event.streams[0],
-        },
+        console.log(`Data channel for session '${sessionId}' is open.`);
       });
-    };
 
-    // Add event listeners to handle data channel lifecycle
-    dc.addEventListener('open', () => {
-      dispatch({
-        type: SessionActionType.UPDATE_SESSION,
-        payload: {
-          id: sessionId,
-          isConnecting: false,
-          isConnected: true,
-        } as RealtimeSession,
-      });
-      console.log(`Data channel for session '${sessionId}' is open.`);
-    });
-
-    dc.addEventListener('message', (e: MessageEvent<string>) => {
-      const event: RealtimeEvent = JSON.parse(
-        e.data
-      ) as unknown as RealtimeEvent;
-      switch (event.type) {
-        /**
-         * Triggered when an input audio transcription is completed.
-         * This event provides the final transcript for the user's audio input.
-         */
-        case RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED:
-          dispatch({
-            type: SessionActionType.ADD_TRANSCRIPT,
-            payload: {
-              sessionId,
-              transcript: {
-                content: event.transcript,
-                timestamp: Date.now(),
-                type: TranscriptType.INPUT,
-                role: ConversationRole.USER,
-              },
-            },
-          });
-          break;
-        /**
-         * Triggered when an assistant's audio response transcription is finalized.
-         * This event provides the final transcript for the assistant's audio output.
-         */
-        case RealtimeEventType.RESPONSE_AUDIO_TRANSCRIPT_DONE:
-          dispatch({
-            type: SessionActionType.ADD_TRANSCRIPT,
-            payload: {
-              sessionId,
-              transcript: {
-                content: event.transcript,
-                timestamp: Date.now(),
-                type: TranscriptType.OUTPUT,
-                role: ConversationRole.ASSISTANT,
-              },
-            },
-          });
-          break;
-        /**
-         * Trigger when an error occurs during processing.
-         * This event provides information about the error that occurred.
-         */
-        case RealtimeEventType.ERROR:
-          dispatch({
-            type: SessionActionType.ADD_ERROR,
-            payload: {
-              sessionId,
-              error: event.error,
-            },
-          });
-          break;
-
-        case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
-          const responseEvent = event as ResponseOutputItemDoneEvent;
-          // Check if it's a function call
-          if (responseEvent.item.type === ConversationItemType.FUNCTION_CALL) {
-            functionCallHandler?.(
-              responseEvent.item.name as string,
-              JSON.parse(responseEvent.item?.arguments || '{}')
-            );
-          }
-          break;
-
-        case RealtimeEventType.RESPONSE_DONE: {
-          const responseEvent = event as ResponseDoneEvent;
-          const usage = responseEvent.response?.usage;
-          if (usage) {
-            // Dispatch token usage to the reducer
+      dc.addEventListener('message', (e: MessageEvent<string>) => {
+        const event: RealtimeEvent = JSON.parse(
+          e.data
+        ) as unknown as RealtimeEvent;
+        switch (event.type) {
+          /**
+           * Triggered when an input audio transcription is completed.
+           * This event provides the final transcript for the user's audio input.
+           */
+          case RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED:
             dispatch({
-              type: SessionActionType.UPDATE_TOKEN_USAGE,
+              type: SessionActionType.ADD_TRANSCRIPT,
               payload: {
                 sessionId,
-                tokenUsage: {
-                  inputTokens: usage.input_tokens,
-                  outputTokens: usage.output_tokens,
-                  totalTokens: usage.total_tokens,
+                transcript: {
+                  content: event.transcript,
+                  timestamp: Date.now(),
+                  type: TranscriptType.INPUT,
+                  role: ConversationRole.USER,
                 },
               },
             });
-          }
-          break;
-        }
-        default:
-          break;
-      }
-    });
+            break;
+          /**
+           * Triggered when an assistant's audio response transcription is finalized.
+           * This event provides the final transcript for the assistant's audio output.
+           */
+          case RealtimeEventType.RESPONSE_AUDIO_TRANSCRIPT_DONE:
+            dispatch({
+              type: SessionActionType.ADD_TRANSCRIPT,
+              payload: {
+                sessionId,
+                transcript: {
+                  content: event.transcript,
+                  timestamp: Date.now(),
+                  type: TranscriptType.OUTPUT,
+                  role: ConversationRole.ASSISTANT,
+                },
+              },
+            });
+            break;
+          /**
+           * Trigger when an error occurs during processing.
+           * This event provides information about the error that occurred.
+           */
+          case RealtimeEventType.ERROR:
+            dispatch({
+              type: SessionActionType.ADD_ERROR,
+              payload: {
+                sessionId,
+                error: event.error,
+              },
+            });
+            break;
 
-    dc.addEventListener('close', () => {
-      console.log(`Session '${sessionId}' closed.`);
-      dispatch({
-        type: SessionActionType.REMOVE_SESSION,
-        payload: { id: sessionId },
+          case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
+            const responseEvent = event as ResponseOutputItemDoneEvent;
+            // Check if it's a function call
+            if (
+              responseEvent.item.type === ConversationItemType.FUNCTION_CALL
+            ) {
+              functionCallHandler?.(
+                responseEvent.item.name as string,
+                JSON.parse(responseEvent.item?.arguments || '{}')
+              );
+            }
+            break;
+
+          case RealtimeEventType.RESPONSE_DONE: {
+            const responseEvent = event as ResponseDoneEvent;
+            const usage = responseEvent.response?.usage;
+            if (usage) {
+              // Dispatch token usage to the reducer
+              dispatch({
+                type: SessionActionType.UPDATE_TOKEN_USAGE,
+                payload: {
+                  sessionId,
+                  tokenUsage: {
+                    inputTokens: usage.input_tokens,
+                    outputTokens: usage.output_tokens,
+                    totalTokens: usage.total_tokens,
+                  },
+                },
+              });
+            }
+            break;
+          }
+          default:
+            break;
+        }
       });
-    });
+
+      dc.addEventListener('close', () => {
+        console.log(`Session '${sessionId}' closed.`);
+        dispatch({
+          type: SessionActionType.REMOVE_SESSION,
+          payload: { id: sessionId },
+        });
+      });
+    } catch (error) {
+      console.error(`Failed to start session '${sessionId}':`, error);
+      if (iceTimeoutId) {
+        clearTimeout(iceTimeoutId);
+      }
+      throw error;
+    }
   };
 
   /**
