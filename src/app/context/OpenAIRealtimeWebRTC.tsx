@@ -29,7 +29,10 @@ import {
   Modality,
   SessionCloseOptions,
   ConnectionStatus,
-  AudioSettings,
+  RateLimit,
+  WebRTCErrorCode,
+  RateLimitsUpdatedEvent,
+  OpenAIRealtimeWebRTCProviderProps,
 } from '../types';
 
 /**
@@ -145,6 +148,7 @@ export enum SessionActionType {
   UPDATE_TOKEN_USAGE = 'UPDATE_TOKEN_USAGE',
   MUTE_SESSION_AUDIO = 'MUTE_SESSION_AUDIO',
   UNMUTE_SESSION_AUDIO = 'UNMUTE_SESSION_AUDIO',
+  UPDATE_RATE_LIMITS = 'UPDATE_RATE_LIMITS',
 }
 
 // Action interfaces for type safety
@@ -199,6 +203,16 @@ interface UnmuteSessionAudioAction {
   payload: { sessionId: string };
 }
 
+interface UpdateRateLimitsAction {
+  type: SessionActionType.UPDATE_RATE_LIMITS;
+  payload: {
+    sessionId: string;
+    rateLimits: RateLimit[];
+    rateLimitResetTime: string;
+    isRateLimited: boolean;
+  };
+}
+
 // Union type for all actions
 type SessionAction =
   | AddSessionAction
@@ -209,7 +223,8 @@ type SessionAction =
   | SetFunctionCallHandlerAction
   | UpdateTokenUsageAction
   | MuteSessionAudioAction
-  | UnmuteSessionAudioAction;
+  | UnmuteSessionAudioAction
+  | UpdateRateLimitsAction;
 
 // Reducer state type
 type ChannelState = RealtimeSession[];
@@ -275,6 +290,17 @@ export const sessionReducer = (
       return state.map((session) =>
         session.id === action.payload.sessionId
           ? { ...session, isMuted: false }
+          : session
+      );
+    case SessionActionType.UPDATE_RATE_LIMITS:
+      return state.map((session) =>
+        session.id === action.payload.sessionId
+          ? {
+              ...session,
+              rateLimits: action.payload.rateLimits,
+              rateLimitResetTime: action.payload.rateLimitResetTime,
+              isRateLimited: action.payload.isRateLimited,
+            }
           : session
       );
 
@@ -362,9 +388,9 @@ export const useSession = (id?: string | undefined) => {
   };
 };
 
-export const OpenAIRealtimeWebRTCProvider: React.FC<{
-  children: React.ReactNode;
-}> = ({ children }) => {
+export const OpenAIRealtimeWebRTCProvider: React.FC<
+  OpenAIRealtimeWebRTCProviderProps
+> = ({ config, children }) => {
   const [sessions, dispatch] = useReducer(sessionReducer, []);
 
   // get session by id
@@ -384,16 +410,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         iceServers: [], // OpenAI handles this
       });
 
-      // Use custom audio settings if provided, otherwise use defaults
-      const defaultAudioSettings: AudioSettings = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 48000, // Optimal for speech
-      };
-
-      const audioSettings =
-        realtimeSession.audioSettings || defaultAudioSettings;
+      // Use config audio settings if provided
+      const audioSettings = realtimeSession.audioSettings ||
+        config.defaultAudioSettings || {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+        };
 
       // Get user media if audio modality is required
       let localStream: MediaStream | undefined;
@@ -439,16 +463,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       ): Promise<void> => {
         console.log(`Attempting reconnection for session '${sessionId}'`);
         try {
-          // Create an offer with ICE restart enabled
           const offer = await pc.createOffer({
             iceRestart: true,
             offerToReceiveAudio: true,
           });
-          console.log('Reconnection offer SDP:', offer.sdp);
           await pc.setLocalDescription(offer);
 
           const response = await fetch(
-            `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+            `${config.realtimeApiUrl}?model=${config.modelId}`,
             {
               method: 'POST',
               body: offer.sdp,
@@ -492,6 +514,15 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
           // Optionally, update session state to a failed status or retain DISCONNECTED
         }
       };
+
+      // Set ICE timeout from config
+      const iceTimeout = config.defaultIceTimeout || 30000;
+      iceTimeoutId = setTimeout(() => {
+        if (pc.iceConnectionState !== 'connected') {
+          console.error(`ICE connection timeout for session '${sessionId}'`);
+          // Handle timeout...
+        }
+      }, iceTimeout);
 
       // Enhance ICE connection monitoring with reconnection logic
       const monitorConnectionState = (pc: RTCPeerConnection) => {
@@ -677,7 +708,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
           await pc.setLocalDescription(offer);
 
           const response = await fetch(
-            `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+            `${config.realtimeApiUrl}?model=${config.modelId}`,
             {
               method: 'POST',
               body: offer.sdp,
@@ -830,6 +861,49 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
             }
             break;
           }
+
+          case RealtimeEventType.RATE_LIMITS_UPDATED:
+            const rateLimitsEvent = event as RateLimitsUpdatedEvent;
+            const maxResetSeconds = Math.max(
+              ...rateLimitsEvent.rate_limits.map((limit) => limit.reset_seconds)
+            );
+            const resetTime = new Date(
+              Date.now() + maxResetSeconds * 1000
+            ).toISOString();
+            const isRateLimited = rateLimitsEvent.rate_limits.some(
+              (limit) => limit.remaining <= 0
+            );
+
+            dispatch({
+              type: SessionActionType.UPDATE_RATE_LIMITS,
+              payload: {
+                sessionId,
+                rateLimits: rateLimitsEvent.rate_limits,
+                rateLimitResetTime: resetTime,
+                isRateLimited,
+              },
+            });
+
+            // If rate limited, add an error
+            if (isRateLimited) {
+              dispatch({
+                type: SessionActionType.ADD_ERROR,
+                payload: {
+                  sessionId,
+                  error: {
+                    event_id: crypto.randomUUID(),
+                    type: 'rate_limit_error',
+                    code: WebRTCErrorCode.RATE_LIMIT_EXCEEDED,
+                    message: 'Rate limit exceeded',
+                    param: null,
+                    related_event_id: event.event_id || null,
+                    timestamp: Date.now(),
+                  },
+                },
+              });
+            }
+            break;
+
           default:
             break;
         }

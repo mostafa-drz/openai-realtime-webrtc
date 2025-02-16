@@ -599,6 +599,39 @@ interface UpdateSessionConfigEvent extends BaseRealtimeEvent {
 }
 
 /**
+ * Rate limit information for a specific resource
+ */
+export interface RateLimit {
+  /**
+   * The name of the rate limit (requests, tokens)
+   */
+  name: 'requests' | 'tokens';
+
+  /**
+   * The maximum allowed value for the rate limit
+   */
+  limit: number;
+
+  /**
+   * The remaining value before the limit is reached
+   */
+  remaining: number;
+
+  /**
+   * Seconds until the rate limit resets
+   */
+  reset_seconds: number;
+}
+
+/**
+ * Event for rate limit updates
+ */
+export interface RateLimitsUpdatedEvent extends BaseRealtimeEvent {
+  type: RealtimeEventType.RATE_LIMITS_UPDATED;
+  rate_limits: RateLimit[];
+}
+
+/**
  * Union type for all OpenAI WebRTC events.
  */
 export type RealtimeEvent =
@@ -614,7 +647,8 @@ export type RealtimeEvent =
   | ConversationItemCreateEvent
   | ResponseOutputItemDoneEvent
   | ResponseDoneEvent
-  | UpdateSessionConfigEvent;
+  | UpdateSessionConfigEvent
+  | RateLimitsUpdatedEvent;
 
 /**
  * Interface representing a transcript in a session.
@@ -918,6 +952,21 @@ export interface RealtimeSession {
    * Indicates whether the session currently has an active audio track.
    */
   hasAudio?: boolean;
+
+  /**
+   * Current rate limits for the session
+   */
+  rateLimits?: RateLimit[];
+
+  /**
+   * Timestamp when rate limits will reset
+   */
+  rateLimitResetTime?: string;
+
+  /**
+   * Flag indicating if the session is currently rate limited
+   */
+  isRateLimited?: boolean;
 }
 
 export type OpenAICreateSessionParams = Pick<
@@ -1115,6 +1164,7 @@ export enum WebRTCErrorCode {
   DATA_CHANNEL_FAILED = 'data_channel_failed',
   MEDIA_ACCESS_DENIED = 'media_access_denied',
   SIGNALING_FAILED = 'signaling_failed',
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
 }
 
 /**
@@ -1126,4 +1176,54 @@ export interface AudioSettings {
   noiseSuppression?: boolean;
   autoGainControl?: boolean;
   sampleRate?: number;
+}
+
+/**
+ * Configuration for the OpenAI Realtime Context
+ * Contains global settings that apply to all sessions
+ */
+export interface OpenAIRealtimeContextConfig {
+  /**
+   * Base URL for OpenAI's Realtime API endpoints
+   * @example "https://api.openai.com/v1/realtime"
+   */
+  realtimeApiUrl: string;
+
+  /**
+   * The model identifier to use for realtime sessions
+   * @example "gpt-4"
+   */
+  modelId: string;
+
+  /**
+   * Default configuration for new sessions
+   * Optional settings that will be applied to all new sessions unless overridden
+   */
+  defaultSessionConfig?: Partial<SessionConfig>;
+
+  /**
+   * Default timeout for ICE connection in milliseconds
+   * @default 30000 (30 seconds)
+   */
+  defaultIceTimeout?: number;
+
+  /**
+   * Default audio settings to be used across all sessions
+   */
+  defaultAudioSettings?: AudioSettings;
+}
+
+/**
+ * Props for the OpenAIRealtimeWebRTC Context Provider
+ */
+export interface OpenAIRealtimeWebRTCProviderProps {
+  /**
+   * Configuration for the context
+   */
+  config: OpenAIRealtimeContextConfig;
+
+  /**
+   * React children
+   */
+  children: React.ReactNode;
 }
