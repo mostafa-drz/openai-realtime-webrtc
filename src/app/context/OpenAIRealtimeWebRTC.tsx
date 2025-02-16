@@ -29,10 +29,10 @@ import {
   Modality,
   SessionCloseOptions,
   ConnectionStatus,
-  AudioSettings,
   RateLimit,
   WebRTCErrorCode,
   RateLimitsUpdatedEvent,
+  OpenAIRealtimeWebRTCProviderProps,
 } from '../types';
 
 /**
@@ -388,9 +388,9 @@ export const useSession = (id?: string | undefined) => {
   };
 };
 
-export const OpenAIRealtimeWebRTCProvider: React.FC<{
-  children: React.ReactNode;
-}> = ({ children }) => {
+export const OpenAIRealtimeWebRTCProvider: React.FC<
+  OpenAIRealtimeWebRTCProviderProps
+> = ({ config, children }) => {
   const [sessions, dispatch] = useReducer(sessionReducer, []);
 
   // get session by id
@@ -410,16 +410,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
         iceServers: [], // OpenAI handles this
       });
 
-      // Use custom audio settings if provided, otherwise use defaults
-      const defaultAudioSettings: AudioSettings = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 48000, // Optimal for speech
-      };
-
-      const audioSettings =
-        realtimeSession.audioSettings || defaultAudioSettings;
+      // Use config audio settings if provided
+      const audioSettings = realtimeSession.audioSettings ||
+        config.defaultAudioSettings || {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+        };
 
       // Get user media if audio modality is required
       let localStream: MediaStream | undefined;
@@ -465,16 +463,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
       ): Promise<void> => {
         console.log(`Attempting reconnection for session '${sessionId}'`);
         try {
-          // Create an offer with ICE restart enabled
           const offer = await pc.createOffer({
             iceRestart: true,
             offerToReceiveAudio: true,
           });
-          console.log('Reconnection offer SDP:', offer.sdp);
           await pc.setLocalDescription(offer);
 
           const response = await fetch(
-            `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+            `${config.realtimeApiUrl}?model=${config.modelId}`,
             {
               method: 'POST',
               body: offer.sdp,
@@ -518,6 +514,15 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
           // Optionally, update session state to a failed status or retain DISCONNECTED
         }
       };
+
+      // Set ICE timeout from config
+      const iceTimeout = config.defaultIceTimeout || 30000;
+      iceTimeoutId = setTimeout(() => {
+        if (pc.iceConnectionState !== 'connected') {
+          console.error(`ICE connection timeout for session '${sessionId}'`);
+          // Handle timeout...
+        }
+      }, iceTimeout);
 
       // Enhance ICE connection monitoring with reconnection logic
       const monitorConnectionState = (pc: RTCPeerConnection) => {
@@ -703,7 +708,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<{
           await pc.setLocalDescription(offer);
 
           const response = await fetch(
-            `https://api.openai.com/v1/realtime?model=${process.env.NEXT_PUBLIC_OPEN_AI_MODEL_ID}`,
+            `${config.realtimeApiUrl}?model=${config.modelId}`,
             {
               method: 'POST',
               body: offer.sdp,

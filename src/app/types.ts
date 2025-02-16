@@ -1177,3 +1177,53 @@ export interface AudioSettings {
   autoGainControl?: boolean;
   sampleRate?: number;
 }
+
+/**
+ * Configuration for the OpenAI Realtime Context
+ * Contains global settings that apply to all sessions
+ */
+export interface OpenAIRealtimeContextConfig {
+  /**
+   * Base URL for OpenAI's Realtime API endpoints
+   * @example "https://api.openai.com/v1/realtime"
+   */
+  realtimeApiUrl: string;
+
+  /**
+   * The model identifier to use for realtime sessions
+   * @example "gpt-4"
+   */
+  modelId: string;
+
+  /**
+   * Default configuration for new sessions
+   * Optional settings that will be applied to all new sessions unless overridden
+   */
+  defaultSessionConfig?: Partial<SessionConfig>;
+
+  /**
+   * Default timeout for ICE connection in milliseconds
+   * @default 30000 (30 seconds)
+   */
+  defaultIceTimeout?: number;
+
+  /**
+   * Default audio settings to be used across all sessions
+   */
+  defaultAudioSettings?: AudioSettings;
+}
+
+/**
+ * Props for the OpenAIRealtimeWebRTC Context Provider
+ */
+export interface OpenAIRealtimeWebRTCProviderProps {
+  /**
+   * Configuration for the context
+   */
+  config: OpenAIRealtimeContextConfig;
+
+  /**
+   * React children
+   */
+  children: React.ReactNode;
+}
