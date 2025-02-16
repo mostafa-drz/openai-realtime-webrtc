@@ -13,7 +13,7 @@ import {
 
 // Move the logger creation to a client component
 const ClientProvider = ({ children }: { children: React.ReactNode }) => {
-  // Create a fancy colored console logger
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const createFancyLogger = (): Logger => {
     const styles = {
       [LogLevel.DEBUG]: 'color: #808080', // gray
@@ -62,7 +62,16 @@ const ClientProvider = ({ children }: { children: React.ReactNode }) => {
   const defaultConfig: OpenAIRealtimeContextConfig = {
     realtimeApiUrl: 'https://api.openai.com/v1/realtime',
     modelId: 'gpt-4o-realtime-preview-2024-12-17',
-    logger: createFancyLogger(), // Create logger on the client side
+    // logger: createFancyLogger(), // Create logger on the client side
+    // logger: console,
+    logger: {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: (...all) => {
+        console.error(...all);
+      },
+    },
     defaultSessionConfig: {
       modalities: [Modality.TEXT, Modality.AUDIO],
       input_audio_transcription: {
