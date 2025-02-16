@@ -34,6 +34,7 @@ import {
   RateLimitsUpdatedEvent,
   OpenAIRealtimeWebRTCProviderProps,
 } from '../types';
+import { createNoopLogger } from '../utils/logger';
 
 /**
  * Context type definition for managing OpenAI Realtime WebRTC sessions.
@@ -393,6 +394,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 > = ({ config, children }) => {
   const [sessions, dispatch] = useReducer(sessionReducer, []);
 
+  const logger = config.logger || createNoopLogger();
+
   // get session by id
   const getSessionById = (sessionId: string): RealtimeSession | null => {
     return sessions.find((session) => session.id === sessionId) || null;
@@ -439,7 +442,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             }
             // Monitor track status
             track.onended = () => {
-              console.log('Audio track ended');
+              logger.info('Audio track ended', { sessionId });
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
@@ -449,8 +452,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               });
             };
           });
-        } catch (error) {
-          console.error('Failed to get user media:', error);
+        } catch (error: unknown) {
+          logger.error('Failed to get user media:', { sessionId, error });
           throw new Error('Microphone access failed');
         }
       }
@@ -461,7 +464,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       const attemptReconnection = async (
         pc: RTCPeerConnection
       ): Promise<void> => {
-        console.log(`Attempting reconnection for session '${sessionId}'`);
+        logger.info(`Attempting reconnection for session '${sessionId}'`);
         try {
           const offer = await pc.createOffer({
             iceRestart: true,
@@ -483,10 +486,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(
-              'Reconnection failed, error from OpenAI API:',
-              errorText
-            );
+            logger.error('Reconnection failed, error from OpenAI API:', {
+              sessionId,
+              errorText,
+            });
             throw new Error(errorText);
           }
 
@@ -497,7 +500,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               sdp: answerSdp,
             })
           );
-          console.log(`Reconnection successful for session '${sessionId}'`);
+          logger.info(`Reconnection successful for session '${sessionId}'`);
           // Update session state to "CONNECTED" after successful reconnection
           dispatch({
             type: SessionActionType.UPDATE_SESSION,
@@ -509,8 +512,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               lastStateChange: new Date().toISOString(),
             },
           });
-        } catch (error) {
-          console.error(`Failed to reconnect session '${sessionId}':`, error);
+        } catch (error: unknown) {
+          logger.error(`Failed to reconnect session '${sessionId}':`, {
+            sessionId,
+            error,
+          });
           // Optionally, update session state to a failed status or retain DISCONNECTED
         }
       };
@@ -519,7 +525,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       const iceTimeout = config.defaultIceTimeout || 30000;
       iceTimeoutId = setTimeout(() => {
         if (pc.iceConnectionState !== 'connected') {
-          console.error(`ICE connection timeout for session '${sessionId}'`);
+          logger.error(`ICE connection timeout for session '${sessionId}'`);
           // Handle timeout...
         }
       }, iceTimeout);
@@ -528,10 +534,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       const monitorConnectionState = (pc: RTCPeerConnection) => {
         pc.oniceconnectionstatechange = () => {
           const state = pc.iceConnectionState;
-          console.log(
-            `ICE Connection State for session '${sessionId}':`,
-            state
-          );
+          logger.info(`ICE Connection State for session '${sessionId}':`, {
+            sessionId,
+            state,
+          });
 
           switch (state) {
             case 'checking':
@@ -576,7 +582,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                   lastStateChange: new Date().toISOString(),
                 },
               });
-              console.warn(
+              logger.warn(
                 `Session '${sessionId}' disconnected. Attempting reconnection...`
               );
               // Delay before starting the reconnection to avoid immediate retry
@@ -654,7 +660,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
         // Set ICE connection timeout remains as before
         iceTimeoutId = setTimeout(() => {
-          console.error(`ICE connection timeout for session '${sessionId}'`);
+          logger.error(`ICE connection timeout for session '${sessionId}'`);
           dispatch({
             type: SessionActionType.ADD_ERROR,
             payload: {
@@ -685,7 +691,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         type: SessionActionType.ADD_SESSION,
         payload: {
           ...realtimeSession,
-          peerConnection: pc,
+          peer_connection: pc,
           dataChannel: dc,
           tokenRef: realtimeSession?.client_secret?.value,
           isConnecting: true,
@@ -696,14 +702,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
       pc.onnegotiationneeded = async () => {
         try {
-          console.log(`Negotiation needed for session '${sessionId}'`);
+          logger.info(`Negotiation needed for session '${sessionId}'`);
 
           // Create offer with explicit audio
           const offer = await pc.createOffer({
             offerToReceiveAudio: true, // Explicitly request audio
           });
 
-          console.log('Generated offer SDP:', offer.sdp); // Debug log
+          logger.info('Generated offer SDP:', { sessionId, offer: offer.sdp }); // Debug log
 
           await pc.setLocalDescription(offer);
 
@@ -721,12 +727,12 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('OpenAI API error:', errorText);
+            logger.error('OpenAI API error:', { sessionId, errorText });
             throw new Error(errorText);
           }
 
           const answerSdp = await response.text();
-          console.log('Received answer SDP:', answerSdp); // Debug log
+          logger.info('Received answer SDP:', { sessionId, answerSdp }); // Debug log
 
           await pc.setRemoteDescription(
             new RTCSessionDescription({
@@ -735,16 +741,19 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             })
           );
 
-          console.log(`Negotiation completed for session '${sessionId}'`);
-        } catch (error) {
-          console.error(`Failed to negotiate session '${sessionId}':`, error);
+          logger.info(`Negotiation completed for session '${sessionId}'`);
+        } catch (error: unknown) {
+          logger.error(`Failed to negotiate session '${sessionId}':`, {
+            sessionId,
+            error,
+          });
           // ... error handling ...
         }
       };
 
       // Handle tracks with cleanup
       pc.ontrack = (event) => {
-        console.log(`Remote stream received for session '${sessionId}'.`);
+        logger.info(`Remote stream received for session '${sessionId}'.`);
         event.track.onended = () => {
           const session = getSessionById(sessionId);
           if (session) {
@@ -771,7 +780,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             isConnected: true,
           } as RealtimeSession,
         });
-        console.log(`Data channel for session '${sessionId}' is open.`);
+        logger.info(`Data channel for session '${sessionId}' is open.`);
       });
 
       dc.addEventListener('message', (e: MessageEvent<string>) => {
@@ -910,14 +919,17 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       });
 
       dc.addEventListener('close', () => {
-        console.log(`Session '${sessionId}' closed.`);
+        logger.info(`Session '${sessionId}' closed.`);
         dispatch({
           type: SessionActionType.REMOVE_SESSION,
           payload: { id: sessionId },
         });
       });
-    } catch (error) {
-      console.error(`Failed to start session '${sessionId}':`, error);
+    } catch (error: unknown) {
+      logger.error(`Failed to start session '${sessionId}':`, {
+        sessionId,
+        error,
+      });
       if (iceTimeoutId) {
         clearTimeout(iceTimeoutId);
       }
@@ -937,7 +949,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
   ): void => {
     const session = getSessionById(sessionId);
     if (!session) {
-      console.warn(`Session with ID '${sessionId}' does not exist.`);
+      logger.warn(`Session with ID '${sessionId}' does not exist.`);
       return;
     }
 
@@ -970,7 +982,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       });
     }
 
-    console.log(
+    logger.info(
       `Session '${sessionId}' connection closed. Duration: ${duration}s. Session ${
         options.removeAfterConnectionClose ? 'removed from' : 'kept in'
       } state.`
@@ -988,7 +1000,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     const session = sessions.find((s) => s.id === sessionId);
 
     if (!session) {
-      console.error(`Session with ID '${sessionId}' does not exist.`);
+      logger.error(`Session with ID '${sessionId}' does not exist.`);
       return;
     }
 
@@ -996,7 +1008,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
     // Ensure the data channel is open before sending the event
     if (!dataChannel || dataChannel.readyState !== 'open') {
-      console.error(
+      logger.error(
         `Data channel for session '${sessionId}' is not open. Cannot send event.`
       );
       return;
@@ -1008,9 +1020,15 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     // Send the event over the session's data channel
     try {
       dataChannel.send(JSON.stringify(event));
-      console.log(`Event sent to session '${sessionId}':`, event);
-    } catch (error) {
-      console.error(`Failed to send event to session '${sessionId}':`, error);
+      logger.info(`Event sent to session '${sessionId}':`, {
+        sessionId,
+        event,
+      });
+    } catch (error: unknown) {
+      logger.error(`Failed to send event to session '${sessionId}':`, {
+        sessionId,
+        error,
+      });
     }
   };
 

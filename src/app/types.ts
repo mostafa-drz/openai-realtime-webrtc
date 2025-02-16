@@ -1211,6 +1211,11 @@ export interface OpenAIRealtimeContextConfig {
    * Default audio settings to be used across all sessions
    */
   defaultAudioSettings?: AudioSettings;
+
+  /**
+   * Logger instance for logging session events
+   */
+  logger?: Logger;
 }
 
 /**
@@ -1226,4 +1231,27 @@ export interface OpenAIRealtimeWebRTCProviderProps {
    * React children
    */
   children: React.ReactNode;
+}
+
+export enum LogLevel {
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR',
+}
+
+export interface LogMessage {
+  level: LogLevel;
+  message: string;
+  sessionId?: string;
+  timestamp: string;
+  data?: unknown;
+  error?: Error;
+}
+
+export interface Logger {
+  debug(message: string, meta?: { [key: string]: unknown }): void;
+  info(message: string, meta?: { [key: string]: unknown }): void;
+  warn(message: string, meta?: { [key: string]: unknown }): void;
+  error(message: string, meta?: { [key: string]: unknown }): void;
 }
