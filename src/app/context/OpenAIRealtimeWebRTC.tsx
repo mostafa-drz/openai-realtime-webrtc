@@ -396,6 +396,18 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
   const logger = config.logger || createNoopLogger();
 
+  useEffect(() => {
+    logger.info('OpenAIRealtimeWebRTCProvider initialized', {
+      config,
+    });
+
+    return () => {
+      logger.info('OpenAIRealtimeWebRTCProvider unmounted', {
+        config,
+      });
+    };
+  }, [config, logger]);
+
   // get session by id
   const getSessionById = (sessionId: string): RealtimeSession | null => {
     return sessions.find((session) => session.id === sessionId) || null;
@@ -429,9 +441,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
           localStream = await navigator.mediaDevices.getUserMedia({
             audio: audioSettings,
           });
+          logger.info('Local stream created', { sessionId });
           localStream.getAudioTracks().forEach((track) => {
             if (localStream) {
               pc.addTrack(track, localStream);
+              logger.info('Audio track added', { sessionId });
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
@@ -471,7 +485,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             offerToReceiveAudio: true,
           });
           await pc.setLocalDescription(offer);
-
+          logger.info('Offer created and set local description', {
+            sessionId,
+            offer,
+          });
           const response = await fetch(
             `${config.realtimeApiUrl}?model=${config.modelId}`,
             {
@@ -492,6 +509,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             });
             throw new Error(errorText);
           }
+          logger.info('Reconnection successful, received answer SDP', {
+            sessionId,
+            response,
+          });
 
           const answerSdp = await response.text();
           await pc.setRemoteDescription(
@@ -500,7 +521,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               sdp: answerSdp,
             })
           );
-          logger.info(`Reconnection successful for session '${sessionId}'`);
+          logger.info(`Reconnection successful for session '${sessionId}'`, {
+            sessionId,
+            answerSdp,
+          });
           // Update session state to "CONNECTED" after successful reconnection
           dispatch({
             type: SessionActionType.UPDATE_SESSION,
@@ -741,13 +765,16 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             })
           );
 
-          logger.info(`Negotiation completed for session '${sessionId}'`);
+          logger.info(`Negotiation completed for session '${sessionId}'`, {
+            sessionId,
+            answerSdp,
+          });
         } catch (error: unknown) {
           logger.error(`Failed to negotiate session '${sessionId}':`, {
             sessionId,
             error,
           });
-          // ... error handling ...
+          throw error;
         }
       };
 
@@ -784,6 +811,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       });
 
       dc.addEventListener('message', (e: MessageEvent<string>) => {
+        logger.info('Received message from data channel', {
+          sessionId,
+          data: e.data,
+        });
         const event: RealtimeEvent = JSON.parse(
           e.data
         ) as unknown as RealtimeEvent;
