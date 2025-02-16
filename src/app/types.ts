@@ -599,6 +599,39 @@ interface UpdateSessionConfigEvent extends BaseRealtimeEvent {
 }
 
 /**
+ * Rate limit information for a specific resource
+ */
+export interface RateLimit {
+  /**
+   * The name of the rate limit (requests, tokens)
+   */
+  name: 'requests' | 'tokens';
+
+  /**
+   * The maximum allowed value for the rate limit
+   */
+  limit: number;
+
+  /**
+   * The remaining value before the limit is reached
+   */
+  remaining: number;
+
+  /**
+   * Seconds until the rate limit resets
+   */
+  reset_seconds: number;
+}
+
+/**
+ * Event for rate limit updates
+ */
+export interface RateLimitsUpdatedEvent extends BaseRealtimeEvent {
+  type: RealtimeEventType.RATE_LIMITS_UPDATED;
+  rate_limits: RateLimit[];
+}
+
+/**
  * Union type for all OpenAI WebRTC events.
  */
 export type RealtimeEvent =
@@ -614,7 +647,8 @@ export type RealtimeEvent =
   | ConversationItemCreateEvent
   | ResponseOutputItemDoneEvent
   | ResponseDoneEvent
-  | UpdateSessionConfigEvent;
+  | UpdateSessionConfigEvent
+  | RateLimitsUpdatedEvent;
 
 /**
  * Interface representing a transcript in a session.
@@ -918,6 +952,21 @@ export interface RealtimeSession {
    * Indicates whether the session currently has an active audio track.
    */
   hasAudio?: boolean;
+
+  /**
+   * Current rate limits for the session
+   */
+  rateLimits?: RateLimit[];
+
+  /**
+   * Timestamp when rate limits will reset
+   */
+  rateLimitResetTime?: string;
+
+  /**
+   * Flag indicating if the session is currently rate limited
+   */
+  isRateLimited?: boolean;
 }
 
 export type OpenAICreateSessionParams = Pick<
@@ -1115,6 +1164,7 @@ export enum WebRTCErrorCode {
   DATA_CHANNEL_FAILED = 'data_channel_failed',
   MEDIA_ACCESS_DENIED = 'media_access_denied',
   SIGNALING_FAILED = 'signaling_failed',
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
 }
 
 /**
