@@ -25,12 +25,10 @@ import {
   TokenUsage,
   ResponseDoneEvent,
   StartSession,
-  SessionError,
   Modality,
   SessionCloseOptions,
   ConnectionStatus,
   RateLimit,
-  WebRTCErrorCode,
   RateLimitsUpdatedEvent,
   OpenAIRealtimeWebRTCProviderProps,
 } from '../types';
@@ -144,7 +142,6 @@ export enum SessionActionType {
   REMOVE_SESSION = 'REMOVE_SESSION',
   UPDATE_SESSION = 'UPDATE_SESSION',
   ADD_TRANSCRIPT = 'ADD_TRANSCRIPT',
-  ADD_ERROR = 'ADD_ERROR',
   SET_FUNCTION_CALL_HANDLER = 'SET_FUNCTION_CALL_HANDLER',
   UPDATE_TOKEN_USAGE = 'UPDATE_TOKEN_USAGE',
   MUTE_SESSION_AUDIO = 'MUTE_SESSION_AUDIO',
@@ -171,11 +168,6 @@ interface UpdateSessionAction {
 interface AddTranscriptAction {
   type: SessionActionType.ADD_TRANSCRIPT;
   payload: { sessionId: string; transcript: Transcript };
-}
-
-interface AddErrorAction {
-  type: SessionActionType.ADD_ERROR;
-  payload: { sessionId: string; error: SessionError };
 }
 
 interface SetFunctionCallHandlerAction {
@@ -220,7 +212,6 @@ type SessionAction =
   | RemoveSessionAction
   | UpdateSessionAction
   | AddTranscriptAction
-  | AddErrorAction
   | SetFunctionCallHandlerAction
   | UpdateTokenUsageAction
   | MuteSessionAudioAction
@@ -257,15 +248,6 @@ export const sessionReducer = (
                 ...(session.transcripts || []),
                 action.payload.transcript,
               ],
-            }
-          : session
-      );
-    case SessionActionType.ADD_ERROR:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? {
-              ...session,
-              errors: [...(session.errors || []), action.payload.error],
             }
           : session
       );
@@ -472,9 +454,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         }
       }
 
-      // --------------------------------------------
-      // NEW: Reconnection mechanism for ICE disconnections
-      // --------------------------------------------
       const attemptReconnection = async (
         pc: RTCPeerConnection
       ): Promise<void> => {
@@ -541,7 +520,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             sessionId,
             error,
           });
-          // Optionally, update session state to a failed status or retain DISCONNECTED
         }
       };
 
@@ -550,7 +528,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       iceTimeoutId = setTimeout(() => {
         if (pc.iceConnectionState !== 'connected') {
           logger.error(`ICE connection timeout for session '${sessionId}'`);
-          // Handle timeout...
+          // handle timeout
+          cleanupWebRTCResources(getSessionById(sessionId));
         }
       }, iceTimeout);
 
@@ -587,8 +566,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
                   id: sessionId,
-                  isConnecting: false,
-                  isConnected: true,
                   connectionStatus: ConnectionStatus.CONNECTED,
                   lastStateChange: new Date().toISOString(),
                 },
@@ -600,8 +577,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
                   id: sessionId,
-                  isConnecting: false,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.DISCONNECTED,
                   lastStateChange: new Date().toISOString(),
                 },
@@ -615,8 +590,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                   type: SessionActionType.UPDATE_SESSION,
                   payload: {
                     id: sessionId,
-                    isConnecting: true,
-                    isConnected: false,
                     connectionStatus: ConnectionStatus.RECONNECTING, // using enum value here
                     lastStateChange: new Date().toISOString(),
                   },
@@ -634,25 +607,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
                   id: sessionId,
-                  isConnecting: false,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.FAILED,
                   lastStateChange: new Date().toISOString(),
-                },
-              });
-              dispatch({
-                type: SessionActionType.ADD_ERROR,
-                payload: {
-                  sessionId,
-                  error: {
-                    event_id: crypto.randomUUID(),
-                    related_event_id: null,
-                    param: null,
-                    type: 'connection_error',
-                    code: 'ice_connection_failed',
-                    message: 'ICE connection failed',
-                    timestamp: Date.now(),
-                  },
                 },
               });
               cleanupWebRTCResources(getSessionById(sessionId));
@@ -667,8 +623,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
                   id: sessionId,
-                  isConnecting: false,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.CLOSED,
                   lastStateChange: new Date().toISOString(),
                 },
@@ -685,21 +639,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         // Set ICE connection timeout remains as before
         iceTimeoutId = setTimeout(() => {
           logger.error(`ICE connection timeout for session '${sessionId}'`);
-          dispatch({
-            type: SessionActionType.ADD_ERROR,
-            payload: {
-              sessionId,
-              error: {
-                event_id: crypto.randomUUID(),
-                related_event_id: null,
-                param: null,
-                type: 'connection_error',
-                code: 'ice_connection_timeout',
-                message: 'ICE connection timed out',
-                timestamp: Date.now(),
-              },
-            },
-          });
           cleanupWebRTCResources(getSessionById(sessionId));
         }, 30000); // 30 second timeout
       };
@@ -728,9 +667,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         try {
           logger.info(`Negotiation needed for session '${sessionId}'`);
 
-          // Create offer with explicit audio
           const offer = await pc.createOffer({
-            offerToReceiveAudio: true, // Explicitly request audio
+            offerToReceiveAudio: true,
           });
 
           logger.info('Generated offer SDP:', { sessionId, offer: offer.sdp }); // Debug log
@@ -855,20 +793,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               },
             });
             break;
-          /**
-           * Trigger when an error occurs during processing.
-           * This event provides information about the error that occurred.
-           */
-          case RealtimeEventType.ERROR:
-            dispatch({
-              type: SessionActionType.ADD_ERROR,
-              payload: {
-                sessionId,
-                error: event.error,
-              },
-            });
-            break;
-
           case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
             const responseEvent = event as ResponseOutputItemDoneEvent;
             // Check if it's a function call
@@ -926,21 +850,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
             // If rate limited, add an error
             if (isRateLimited) {
-              dispatch({
-                type: SessionActionType.ADD_ERROR,
-                payload: {
-                  sessionId,
-                  error: {
-                    event_id: crypto.randomUUID(),
-                    type: 'rate_limit_error',
-                    code: WebRTCErrorCode.RATE_LIMIT_EXCEEDED,
-                    message: 'Rate limit exceeded',
-                    param: null,
-                    related_event_id: event.event_id || null,
-                    timestamp: Date.now(),
-                  },
-                },
-              });
+              logger.error(`Rate limit exceeded for session '${sessionId}'`);
             }
             break;
 

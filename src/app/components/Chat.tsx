@@ -256,42 +256,6 @@ const Chat: React.FC = () => {
           </div>
         )}
 
-        {/* Error Section */}
-        {session?.errors && session.errors.length > 0 && (
-          <div className="border-t pt-4">
-            <h2 className="text-lg font-bold text-red-600">Errors</h2>
-            <div className="overflow-y-auto max-h-32 border rounded p-4 bg-red-50">
-              {session.errors.map((error, index) => (
-                <div key={index} className="mb-2">
-                  <p className="text-sm text-red-800">
-                    <strong>Error Type:</strong> {error.type}
-                  </p>
-                  {error.message && (
-                    <p className="text-sm text-red-700">
-                      <strong>Message:</strong> {error.message}
-                    </p>
-                  )}
-                  {error.code && (
-                    <p className="text-sm text-red-700">
-                      <strong>Code:</strong> {error.code}
-                    </p>
-                  )}
-                  {error.param && (
-                    <p className="text-sm text-red-700">
-                      <strong>Param:</strong> {error.param}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    <strong>Event ID:</strong> {error.event_id} |{' '}
-                    <strong>Timestamp:</strong>{' '}
-                    {new Date(error.timestamp).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Transcripts */}
         {session?.transcripts && session.transcripts.length > 0 && (
           <Transcripts transcripts={session.transcripts} />
