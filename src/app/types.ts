@@ -876,16 +876,6 @@ export interface RealtimeSession {
   dataChannel?: RTCDataChannel | null;
 
   /**
-   * Indicates whether the session is in the process of being established.
-   */
-  isConnecting?: boolean;
-
-  /**
-   * Indicates whether the session is successfully connected and ready for use.
-   */
-  isConnected?: boolean;
-
-  /**
    * The local media stream used for audio output.
    */
   mediaStream?: MediaStream | null;
@@ -1108,7 +1098,7 @@ export type FunctionCallHandler = (
   args: Record<string, unknown>
 ) => void;
 
-export type StartSession = (
+export type Connect = (
   realtimeSession: RealtimeSession,
   functionCallHandler?: FunctionCallHandler
 ) => void;

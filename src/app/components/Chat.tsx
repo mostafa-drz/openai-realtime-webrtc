@@ -13,6 +13,7 @@ import {
   RealtimeEventType,
   Voice,
   OpenAICreateSessionParams,
+  ConnectionStatus,
 } from '../types';
 import tools from './openAITools';
 import Transcripts from './Transcripts';
@@ -63,14 +64,14 @@ const Chat: React.FC = () => {
   });
 
   const {
-    startSession,
+    connect,
     sendClientEvent,
-    closeSession,
+    disconnect,
     session,
     sendAudioChunk,
     commitAudioBuffer,
-    createResponse,
     sendTextMessage,
+    createResponse,
     muteSessionAudio,
     unmuteSessionAudio,
   } = useSession();
@@ -90,7 +91,7 @@ const Chat: React.FC = () => {
   async function onSessionStart() {
     const { connection_timeout, ...rest } = config;
     const newSession = await createNewOpenAISession(rest);
-    startSession({ ...newSession, connection_timeout }, handleFunctionCall);
+    connect({ ...newSession, connection_timeout }, handleFunctionCall);
   }
 
   const handleModeChange = (newMode: 'vad' | 'push-to-talk') => {
@@ -102,7 +103,7 @@ const Chat: React.FC = () => {
     };
     setConfig(updatedConfig);
 
-    if (session?.isConnected) {
+    if (session?.connectionStatus === ConnectionStatus.CONNECTED) {
       sendClientEvent({
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
@@ -121,7 +122,7 @@ const Chat: React.FC = () => {
     setConfig(updatedConfig);
 
     // If session is active, update it
-    if (session?.isConnected) {
+    if (session?.connectionStatus === ConnectionStatus.CONNECTED) {
       sendClientEvent({
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
@@ -180,9 +181,9 @@ const Chat: React.FC = () => {
           <h1 className="text-xl font-bold text-gray-800">AI Chat</h1>
 
           {/* Session Control */}
-          {session?.isConnected ? (
+          {session?.connectionStatus === ConnectionStatus.CONNECTED ? (
             <button
-              onClick={() => closeSession()}
+              onClick={() => disconnect()}
               className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
             >
               End Session
