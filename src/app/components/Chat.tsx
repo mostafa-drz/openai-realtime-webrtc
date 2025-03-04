@@ -12,11 +12,14 @@ import {
   TurnDetectionType,
   RealtimeEventType,
   Voice,
+  OpenAICreateSessionParams,
+  ConnectionStatus,
 } from '../types';
 import tools from './openAITools';
 import Transcripts from './Transcripts';
 import TokenUsage from './TokenUsage';
 import SessionInfo from './SessionInfo';
+import SessionsDebugger from './SessionsDebugger';
 
 // Add voice options based on OpenAI's available voices
 const VOICE_OPTIONS = {
@@ -39,36 +42,41 @@ const defaultTurnDetection: TurnDetectionConfig = {
   silence_duration_ms: 500,
 };
 
+const openAICreateSessionParams: OpenAICreateSessionParams = {
+  modalities: [Modality.TEXT, Modality.AUDIO],
+  input_audio_transcription: {
+    model: 'whisper-1',
+  },
+  voice: Voice.ALLOY,
+  instructions: `
+    You are a fortune teller. You can see the future.
+  `,
+  turn_detection: defaultTurnDetection,
+  tools,
+};
+
 const Chat: React.FC = () => {
   const [mode, setMode] = useState<'vad' | 'push-to-talk'>('vad');
   const [selectedVoice, setSelectedVoice] = useState<VoiceId>('alloy');
   const [config, setConfig] = useState<SessionConfig>({
-    modalities: [Modality.TEXT, Modality.AUDIO],
-    input_audio_transcription: {
-      model: 'whisper-1',
-    },
-    voice: selectedVoice as Voice, // Add voice configuration
-    instructions: `
-      You are a fortune teller. You can see the future.
-    `,
-    turn_detection: defaultTurnDetection,
-    tools,
+    ...openAICreateSessionParams,
+    connection_timeout: 10000,
   });
 
   const {
-    startSession,
+    connect,
     sendClientEvent,
-    closeSession,
+    disconnect,
     session,
     sendAudioChunk,
     commitAudioBuffer,
-    createResponse,
     sendTextMessage,
-    muteSessionAudio,
-    unmuteSessionAudio,
+    createResponse,
   } = useSession();
 
-  async function createNewSession(updatedConfig: SessionConfig) {
+  async function createNewOpenAISession(
+    updatedConfig: OpenAICreateSessionParams
+  ) {
     const session = await (
       await fetch('/api/session', {
         method: 'POST',
@@ -79,8 +87,9 @@ const Chat: React.FC = () => {
   }
 
   async function onSessionStart() {
-    const newSession = await createNewSession(config);
-    startSession({ ...newSession }, handleFunctionCall);
+    const { connection_timeout, ...rest } = config;
+    const newSession = await createNewOpenAISession(rest);
+    connect({ ...newSession, connection_timeout }, handleFunctionCall);
   }
 
   const handleModeChange = (newMode: 'vad' | 'push-to-talk') => {
@@ -92,7 +101,7 @@ const Chat: React.FC = () => {
     };
     setConfig(updatedConfig);
 
-    if (session?.isConnected) {
+    if (session?.connectionStatus === ConnectionStatus.CONNECTED) {
       sendClientEvent({
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
@@ -111,7 +120,7 @@ const Chat: React.FC = () => {
     setConfig(updatedConfig);
 
     // If session is active, update it
-    if (session?.isConnected) {
+    if (session?.connectionStatus === ConnectionStatus.CONNECTED) {
       sendClientEvent({
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
@@ -167,11 +176,11 @@ const Chat: React.FC = () => {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">AI Chat</h1>
-          
+
           {/* Session Control */}
-          {session?.isConnected ? (
+          {session?.connectionStatus === ConnectionStatus.CONNECTED ? (
             <button
-              onClick={() => closeSession()}
+              onClick={() => disconnect()}
               className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
             >
               End Session
@@ -202,7 +211,9 @@ const Chat: React.FC = () => {
 
           <select
             value={mode}
-            onChange={(e) => handleModeChange(e.target.value as 'vad' | 'push-to-talk')}
+            onChange={(e) =>
+              handleModeChange(e.target.value as 'vad' | 'push-to-talk')
+            }
             className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
           >
             <option value="vad">VAD</option>
@@ -234,48 +245,7 @@ const Chat: React.FC = () => {
         {/* WebRTC Player */}
         {session?.mediaStream && (
           <div className="border-t pt-4">
-            <WebRTCPlayer
-              remoteStream={session.mediaStream}
-              isMuted={session.isMuted ?? false}
-              onMute={muteSessionAudio}
-              onUnmute={unmuteSessionAudio}
-            />
-          </div>
-        )}
-
-        {/* Error Section */}
-        {session?.errors && session.errors.length > 0 && (
-          <div className="border-t pt-4">
-            <h2 className="text-lg font-bold text-red-600">Errors</h2>
-            <div className="overflow-y-auto max-h-32 border rounded p-4 bg-red-50">
-              {session.errors.map((error, index) => (
-                <div key={index} className="mb-2">
-                  <p className="text-sm text-red-800">
-                    <strong>Error Type:</strong> {error.type}
-                  </p>
-                  {error.message && (
-                    <p className="text-sm text-red-700">
-                      <strong>Message:</strong> {error.message}
-                    </p>
-                  )}
-                  {error.code && (
-                    <p className="text-sm text-red-700">
-                      <strong>Code:</strong> {error.code}
-                    </p>
-                  )}
-                  {error.param && (
-                    <p className="text-sm text-red-700">
-                      <strong>Param:</strong> {error.param}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    <strong>Event ID:</strong> {error.event_id} |{' '}
-                    <strong>Timestamp:</strong>{' '}
-                    {new Date(error.timestamp).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <WebRTCPlayer remoteStream={session.mediaStream} />
           </div>
         )}
 
@@ -299,7 +269,8 @@ const Chat: React.FC = () => {
                 />
               ) : (
                 <p className="text-gray-600 text-sm italic">
-                  Voice Activity Detection (VAD) mode enabled. Start speaking to interact.
+                  Voice Activity Detection (VAD) mode enabled. Start speaking to
+                  interact.
                 </p>
               )}
             </div>
@@ -313,6 +284,7 @@ const Chat: React.FC = () => {
             />
           )}
         </div>
+        <SessionsDebugger />
       </div>
     </div>
   );
