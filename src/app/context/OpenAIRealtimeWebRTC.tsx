@@ -90,16 +90,6 @@ interface OpenAIRealtimeWebRTCContextType {
    * @param response - The response object to be sent.
    */
   createResponse: (response?: ResponseCreateBody) => void;
-
-  /**
-   * Mutes the audio for a specific session.
-   */
-  muteSessionAudio: () => void;
-
-  /**
-   * Unmutes the audio for a specific session.
-   */
-  unmuteSessionAudio: () => void;
 }
 
 // Create the OpenAI Realtime WebRTC context
@@ -848,18 +838,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     sendClientEvent(commitEvent);
   };
 
-  const muteSessionAudio = (): void => {
-    dispatch({
-      type: SessionActionType.MUTE_SESSION_AUDIO,
-    });
-  };
-
-  const unmuteSessionAudio = (): void => {
-    dispatch({
-      type: SessionActionType.UNMUTE_SESSION_AUDIO,
-    });
-  };
-
   /**
    * Utility function to properly cleanup WebRTC resources
    */
@@ -929,8 +907,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         sendAudioChunk,
         commitAudioBuffer,
         createResponse,
-        muteSessionAudio,
-        unmuteSessionAudio,
       }}
     >
       {children}
