@@ -131,16 +131,17 @@ The context provides type-safe event handling capabilities through `on` and `off
 
 - **Description**: Subscribes to specific WebRTC events
 - **Example**:
+
   ```typescript
   const { on } = useSession();
-  
+
   useEffect(() => {
     const handleAudioStart = (event) => {
       console.log('Audio started:', event);
     };
-    
+
     on(RealtimeEventType.OUTPUT_AUDIO_STARTED, handleAudioStart);
-    
+
     // Cleanup
     return () => off(RealtimeEventType.OUTPUT_AUDIO_STARTED, handleAudioStart);
   }, []);
@@ -169,10 +170,16 @@ const EventLogger = () => {
       console.log('Transcription completed:', event);
     };
 
-    on(RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED, handleTranscription);
+    on(
+      RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED,
+      handleTranscription
+    );
 
     return () => {
-      off(RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED, handleTranscription);
+      off(
+        RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED,
+        handleTranscription
+      );
     };
   }, [on, off]);
 
