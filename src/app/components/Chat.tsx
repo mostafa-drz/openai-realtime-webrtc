@@ -13,6 +13,7 @@ import {
   RealtimeEventType,
   Voice,
   OpenAICreateSessionParams,
+  ConnectionStatus,
 } from '../types';
 import tools from './openAITools';
 import Transcripts from './Transcripts';
@@ -63,14 +64,14 @@ const Chat: React.FC = () => {
   });
 
   const {
-    startSession,
+    connect,
     sendClientEvent,
-    closeSession,
+    disconnect,
     session,
     sendAudioChunk,
     commitAudioBuffer,
-    createResponse,
     sendTextMessage,
+    createResponse,
     muteSessionAudio,
     unmuteSessionAudio,
   } = useSession();
@@ -90,7 +91,7 @@ const Chat: React.FC = () => {
   async function onSessionStart() {
     const { connection_timeout, ...rest } = config;
     const newSession = await createNewOpenAISession(rest);
-    startSession({ ...newSession, connection_timeout }, handleFunctionCall);
+    connect({ ...newSession, connection_timeout }, handleFunctionCall);
   }
 
   const handleModeChange = (newMode: 'vad' | 'push-to-talk') => {
@@ -102,7 +103,7 @@ const Chat: React.FC = () => {
     };
     setConfig(updatedConfig);
 
-    if (session?.isConnected) {
+    if (session?.connectionStatus === ConnectionStatus.CONNECTED) {
       sendClientEvent({
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
@@ -121,7 +122,7 @@ const Chat: React.FC = () => {
     setConfig(updatedConfig);
 
     // If session is active, update it
-    if (session?.isConnected) {
+    if (session?.connectionStatus === ConnectionStatus.CONNECTED) {
       sendClientEvent({
         type: RealtimeEventType.SESSION_UPDATE,
         session: {
@@ -173,16 +174,15 @@ const Chat: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 bg-white rounded-lg shadow-lg space-y-6">
-      <SessionsDebugger />
       {/* Header Section */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">AI Chat</h1>
 
           {/* Session Control */}
-          {session?.isConnected ? (
+          {session?.connectionStatus === ConnectionStatus.CONNECTED ? (
             <button
-              onClick={() => closeSession()}
+              onClick={() => disconnect()}
               className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
             >
               End Session
@@ -256,42 +256,6 @@ const Chat: React.FC = () => {
           </div>
         )}
 
-        {/* Error Section */}
-        {session?.errors && session.errors.length > 0 && (
-          <div className="border-t pt-4">
-            <h2 className="text-lg font-bold text-red-600">Errors</h2>
-            <div className="overflow-y-auto max-h-32 border rounded p-4 bg-red-50">
-              {session.errors.map((error, index) => (
-                <div key={index} className="mb-2">
-                  <p className="text-sm text-red-800">
-                    <strong>Error Type:</strong> {error.type}
-                  </p>
-                  {error.message && (
-                    <p className="text-sm text-red-700">
-                      <strong>Message:</strong> {error.message}
-                    </p>
-                  )}
-                  {error.code && (
-                    <p className="text-sm text-red-700">
-                      <strong>Code:</strong> {error.code}
-                    </p>
-                  )}
-                  {error.param && (
-                    <p className="text-sm text-red-700">
-                      <strong>Param:</strong> {error.param}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    <strong>Event ID:</strong> {error.event_id} |{' '}
-                    <strong>Timestamp:</strong>{' '}
-                    {new Date(error.timestamp).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Transcripts */}
         {session?.transcripts && session.transcripts.length > 0 && (
           <Transcripts transcripts={session.transcripts} />
@@ -327,6 +291,7 @@ const Chat: React.FC = () => {
             />
           )}
         </div>
+        <SessionsDebugger />
       </div>
     </div>
   );

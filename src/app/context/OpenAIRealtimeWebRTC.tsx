@@ -4,8 +4,8 @@ import React, {
   createContext,
   useContext,
   useReducer,
-  useState,
   useEffect,
+  useCallback,
 } from 'react';
 import {
   Transcript,
@@ -24,15 +24,13 @@ import {
   ResponseOutputItemDoneEvent,
   TokenUsage,
   ResponseDoneEvent,
-  StartSession,
-  SessionError,
   Modality,
   SessionCloseOptions,
   ConnectionStatus,
   RateLimit,
-  WebRTCErrorCode,
   RateLimitsUpdatedEvent,
   OpenAIRealtimeWebRTCProviderProps,
+  Connect,
 } from '../types';
 import { createNoopLogger } from '../utils/logger';
 
@@ -43,83 +41,65 @@ interface OpenAIRealtimeWebRTCContextType {
   /**
    * Gets the list of all active sessions.
    */
-  sessions: RealtimeSession[];
-
-  /**
-   * Retrieves the state of a specific session by its ID.
-   *
-   * @param sessionId - The unique identifier for the session.
-   * @returns The session object if found, otherwise `null`.
-   */
-  getSessionById: (sessionId: string) => RealtimeSession | null;
+  session: RealtimeSession | null;
 
   /**
    * Starts a new WebRTC session with the OpenAI API.
-   *
-   * @param sessionId - The unique identifier for the new session.
    * @param realtimeSession - The session object containing configuration.
    * @returns A promise that resolves once the session is successfully started.
    */
-  startSession: StartSession;
+  connect: Connect;
 
   /**
    * Ends an active WebRTC session and cleans up its resources.
    *
-   * @param sessionId - The unique identifier for the session to close.
    * @param options - Configuration options for closing behavior.
    * @param options.removeAfterConnectionClose - Whether to remove the session from state after closing. Defaults to true.
    */
-  closeSession: (sessionId: string, options?: SessionCloseOptions) => void;
+  disconnect: () => void;
 
   /**
    * Sends a text message to a specific session.
    *
-   * @param sessionId - The unique identifier for the session to send the message to.
    * @param message - The text message content.
    */
-  sendTextMessage: (sessionId: string, message: string) => void;
+  sendTextMessage: (message: string) => void;
 
   /**
    * Sends a custom client event to a specific session.
    *
-   * @param sessionId - The unique identifier for the session to send the event to.
    * @param event - The custom event payload.
    */
-  sendClientEvent: (sessionId: string, event: RealtimeEvent) => void;
+  sendClientEvent: (event: RealtimeEvent) => void;
 
   /**
    * Sends an audio chunk to a specific session for processing.
    *
-   * @param sessionId - The unique identifier for the session to send the audio to.
    * @param audioData - The Base64-encoded audio chunk to be sent.
    */
-  sendAudioChunk: (sessionId: string, audioData: string) => void;
+  sendAudioChunk: (audioData: string) => void;
 
   /**
    * Commits the audio buffer for processing in a specific session.
    *
-   * @param sessionId - The unique identifier for the session to commit the audio buffer for.
    */
-  commitAudioBuffer: (sessionId: string) => void;
+  commitAudioBuffer: () => void;
 
   /**
    * Creates a new response for a specific session.
-   * @param sessionId - The unique identifier for the session to send the response to.
    * @param response - The response object to be sent.
    */
-  createResponse: (sessionId: string, response?: ResponseCreateBody) => void;
+  createResponse: (response?: ResponseCreateBody) => void;
 
   /**
    * Mutes the audio for a specific session.
-   * @param sessionId - The unique identifier for the session to mute.
    */
-  muteSessionAudio: (sessionId: string) => void;
+  muteSessionAudio: () => void;
 
   /**
    * Unmutes the audio for a specific session.
-   * @param sessionId - The unique identifier for the session to unmute.
    */
-  unmuteSessionAudio: (sessionId: string) => void;
+  unmuteSessionAudio: () => void;
 }
 
 // Create the OpenAI Realtime WebRTC context
@@ -128,11 +108,11 @@ const OpenAIRealtimeWebRTCContext = createContext<
 >(undefined);
 
 // Export the context for use in other components
-export const useOpenAIRealtimeWebRTC = (): OpenAIRealtimeWebRTCContextType => {
+export const useSession = (): OpenAIRealtimeWebRTCContextType => {
   const context = useContext(OpenAIRealtimeWebRTCContext);
   if (!context) {
     throw new Error(
-      'useOpenAIRealtimeWebRTC must be used within an OpenAIRealtimeWebRTCProvider'
+      'useSession must be used within an OpenAIRealtimeWebRTCProvider'
     );
   }
   return context;
@@ -140,74 +120,46 @@ export const useOpenAIRealtimeWebRTC = (): OpenAIRealtimeWebRTCContextType => {
 
 // Enum for action types to avoid hardcoding strings
 export enum SessionActionType {
-  ADD_SESSION = 'ADD_SESSION',
-  REMOVE_SESSION = 'REMOVE_SESSION',
+  INIT_SESSION = 'INIT_SESSION',
   UPDATE_SESSION = 'UPDATE_SESSION',
   ADD_TRANSCRIPT = 'ADD_TRANSCRIPT',
-  ADD_ERROR = 'ADD_ERROR',
-  SET_FUNCTION_CALL_HANDLER = 'SET_FUNCTION_CALL_HANDLER',
   UPDATE_TOKEN_USAGE = 'UPDATE_TOKEN_USAGE',
   MUTE_SESSION_AUDIO = 'MUTE_SESSION_AUDIO',
   UNMUTE_SESSION_AUDIO = 'UNMUTE_SESSION_AUDIO',
   UPDATE_RATE_LIMITS = 'UPDATE_RATE_LIMITS',
 }
 
-// Action interfaces for type safety
-interface AddSessionAction {
-  type: SessionActionType.ADD_SESSION;
+interface InitSessionAction {
+  type: SessionActionType.INIT_SESSION;
   payload: RealtimeSession;
-}
-
-interface RemoveSessionAction {
-  type: SessionActionType.REMOVE_SESSION;
-  payload: { id: string }; // Only the channel ID is needed to remove
 }
 
 interface UpdateSessionAction {
   type: SessionActionType.UPDATE_SESSION;
-  payload: Partial<RealtimeSession> & { id: string }; // Allow partial updates, must include `id`
+  payload: Partial<RealtimeSession>;
 }
 
 interface AddTranscriptAction {
   type: SessionActionType.ADD_TRANSCRIPT;
-  payload: { sessionId: string; transcript: Transcript };
-}
-
-interface AddErrorAction {
-  type: SessionActionType.ADD_ERROR;
-  payload: { sessionId: string; error: SessionError };
-}
-
-interface SetFunctionCallHandlerAction {
-  type: SessionActionType.SET_FUNCTION_CALL_HANDLER;
-  payload: {
-    sessionId: string;
-    onFunctionCall: (name: string, args: Record<string, unknown>) => void;
-  };
+  payload: { transcript: Transcript };
 }
 
 interface UpdateTokenUsageAction {
   type: SessionActionType.UPDATE_TOKEN_USAGE;
-  /**
-   * Payload containing the session ID and new token usage data.
-   */
-  payload: { sessionId: string; tokenUsage: TokenUsage };
+  payload: { tokenUsage: TokenUsage };
 }
 
 interface MuteSessionAudioAction {
   type: SessionActionType.MUTE_SESSION_AUDIO;
-  payload: { sessionId: string };
 }
 
 interface UnmuteSessionAudioAction {
   type: SessionActionType.UNMUTE_SESSION_AUDIO;
-  payload: { sessionId: string };
 }
 
 interface UpdateRateLimitsAction {
   type: SessionActionType.UPDATE_RATE_LIMITS;
   payload: {
-    sessionId: string;
     rateLimits: RateLimit[];
     rateLimitResetTime: string;
     isRateLimited: boolean;
@@ -216,183 +168,70 @@ interface UpdateRateLimitsAction {
 
 // Union type for all actions
 type SessionAction =
-  | AddSessionAction
-  | RemoveSessionAction
+  | InitSessionAction
   | UpdateSessionAction
   | AddTranscriptAction
-  | AddErrorAction
-  | SetFunctionCallHandlerAction
   | UpdateTokenUsageAction
   | MuteSessionAudioAction
   | UnmuteSessionAudioAction
   | UpdateRateLimitsAction;
 
-// Reducer state type
-type ChannelState = RealtimeSession[];
-
 // Reducer function
 export const sessionReducer = (
-  state: ChannelState,
+  state: RealtimeSession | null,
   action: SessionAction
-): ChannelState => {
+): RealtimeSession | null => {
   switch (action.type) {
-    case SessionActionType.ADD_SESSION:
-      return [...state, action.payload]; // Add a new session to the state
-
-    case SessionActionType.REMOVE_SESSION:
-      return state.filter((session) => session.id !== action.payload.id); // Remove session by ID
-
+    case SessionActionType.INIT_SESSION:
+      return action.payload;
     case SessionActionType.UPDATE_SESSION:
-      return state.map((session) =>
-        session.id === action.payload.id
-          ? { ...session, ...action.payload } // Merge updates with existing session
-          : session
-      );
+      if (!state) {
+        return null;
+      }
+      return { ...state, ...action.payload };
     case SessionActionType.ADD_TRANSCRIPT:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? {
-              ...session,
-              transcripts: [
-                ...(session.transcripts || []),
-                action.payload.transcript,
-              ],
-            }
-          : session
-      );
-    case SessionActionType.ADD_ERROR:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? {
-              ...session,
-              errors: [...(session.errors || []), action.payload.error],
-            }
-          : session
-      );
-    case SessionActionType.SET_FUNCTION_CALL_HANDLER:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? { ...session, onFunctionCall: action.payload.onFunctionCall }
-          : session
-      );
+      if (!state) {
+        return null;
+      }
+      return {
+        ...state,
+        transcripts: [...(state?.transcripts || []), action.payload.transcript],
+      };
     case SessionActionType.UPDATE_TOKEN_USAGE:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? { ...session, tokenUsage: action.payload.tokenUsage }
-          : session
-      );
+      if (!state) {
+        return null;
+      }
+      return { ...state, tokenUsage: action.payload.tokenUsage };
     case SessionActionType.MUTE_SESSION_AUDIO:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? { ...session, isMuted: true }
-          : session
-      );
+      if (!state) {
+        return null;
+      }
+      return { ...state, isMuted: true };
     case SessionActionType.UNMUTE_SESSION_AUDIO:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? { ...session, isMuted: false }
-          : session
-      );
+      if (!state) {
+        return null;
+      }
+      return { ...state, isMuted: false };
     case SessionActionType.UPDATE_RATE_LIMITS:
-      return state.map((session) =>
-        session.id === action.payload.sessionId
-          ? {
-              ...session,
-              rateLimits: action.payload.rateLimits,
-              rateLimitResetTime: action.payload.rateLimitResetTime,
-              isRateLimited: action.payload.isRateLimited,
-            }
-          : session
-      );
-
+      if (!state) {
+        return null;
+      }
+      return {
+        ...state,
+        rateLimits: action.payload.rateLimits,
+        rateLimitResetTime: action.payload.rateLimitResetTime,
+        isRateLimited: action.payload.isRateLimited,
+      };
     default:
       // Ensure exhaustive checks in TypeScript
       throw new Error(`Unhandled action type: ${action}`);
   }
 };
 
-export const useSession = (id?: string | undefined) => {
-  const [sessionId, setSessionId] = useState<string | undefined>(id);
-  const {
-    getSessionById,
-    closeSession,
-    sendTextMessage,
-    sendClientEvent,
-    sendAudioChunk,
-    commitAudioBuffer,
-    createResponse,
-    startSession,
-    muteSessionAudio,
-    unmuteSessionAudio,
-  } = useOpenAIRealtimeWebRTC();
-
-  const handleStartSession: StartSession = async (
-    newSession: RealtimeSession,
-    ...rest
-  ) => {
-    await startSession(newSession, ...rest);
-    setSessionId(newSession.id);
-  };
-
-  const session = sessionId ? getSessionById(sessionId) : undefined;
-
-  if (!session || !sessionId) {
-    return {
-      session,
-      startSession: (newSession: RealtimeSession) =>
-        handleStartSession(newSession),
-      closeSession: () => {
-        throw new Error('Session not started');
-      },
-      sendTextMessage: () => {
-        throw new Error('Session not started');
-      },
-      sendClientEvent: () => {
-        throw new Error('Session not started');
-      },
-      sendAudioChunk: () => {
-        throw new Error('Session not started');
-      },
-      commitAudioBuffer: () => {
-        throw new Error('Session not started');
-      },
-      createResponse: () => {
-        throw new Error('Session not started');
-      },
-      muteSessionAudio: () => {
-        throw new Error('Session not started');
-      },
-      unmuteSessionAudio: () => {
-        throw new Error('Session not started');
-      },
-    };
-  }
-
-  return {
-    session,
-    closeSession: (options?: SessionCloseOptions) =>
-      closeSession(sessionId, options),
-    sendTextMessage: (message: string) => sendTextMessage(sessionId, message),
-    sendClientEvent: (event: RealtimeEvent) =>
-      sendClientEvent(sessionId, event),
-    sendAudioChunk: (audioData: string) => sendAudioChunk(sessionId, audioData),
-    commitAudioBuffer: () => commitAudioBuffer(sessionId),
-    createResponse: (response?: ResponseCreateBody) =>
-      createResponse(sessionId, response),
-    startSession: startSession,
-    muteSessionAudio: () => {
-      muteSessionAudio(sessionId);
-    },
-    unmuteSessionAudio: () => {
-      unmuteSessionAudio(sessionId);
-    },
-  };
-};
-
 export const OpenAIRealtimeWebRTCProvider: React.FC<
   OpenAIRealtimeWebRTCProviderProps
 > = ({ config, children }) => {
-  const [sessions, dispatch] = useReducer(sessionReducer, []);
+  const [session, dispatch] = useReducer(sessionReducer, null);
 
   const logger = config.logger || createNoopLogger();
 
@@ -408,18 +247,16 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     };
   }, [config, logger]);
 
-  // get session by id
-  const getSessionById = (sessionId: string): RealtimeSession | null => {
-    return sessions.find((session) => session.id === sessionId) || null;
-  };
-
-  const startSession: StartSession = async (
+  const connect: Connect = async (
     realtimeSession: RealtimeSession,
     functionCallHandler?: (name: string, args: Record<string, unknown>) => void
   ): Promise<void> => {
     const sessionId = realtimeSession.id;
     let iceTimeoutId: NodeJS.Timeout | null = null;
-
+    dispatch({
+      type: SessionActionType.INIT_SESSION,
+      payload: realtimeSession,
+    });
     try {
       const pc = new RTCPeerConnection({
         iceServers: [], // OpenAI handles this
@@ -472,9 +309,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         }
       }
 
-      // --------------------------------------------
-      // NEW: Reconnection mechanism for ICE disconnections
-      // --------------------------------------------
       const attemptReconnection = async (
         pc: RTCPeerConnection
       ): Promise<void> => {
@@ -530,8 +364,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             type: SessionActionType.UPDATE_SESSION,
             payload: {
               id: sessionId,
-              isConnecting: false,
-              isConnected: true,
               connectionStatus: ConnectionStatus.CONNECTED,
               lastStateChange: new Date().toISOString(),
             },
@@ -541,7 +373,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             sessionId,
             error,
           });
-          // Optionally, update session state to a failed status or retain DISCONNECTED
         }
       };
 
@@ -550,7 +381,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       iceTimeoutId = setTimeout(() => {
         if (pc.iceConnectionState !== 'connected') {
           logger.error(`ICE connection timeout for session '${sessionId}'`);
-          // Handle timeout...
+          // handle timeout
+          cleanupWebRTCResources();
         }
       }, iceTimeout);
 
@@ -568,9 +400,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
-                  id: sessionId,
-                  isConnecting: true,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.CONNECTING,
                   lastStateChange: new Date().toISOString(),
                 },
@@ -586,9 +415,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
-                  id: sessionId,
-                  isConnecting: false,
-                  isConnected: true,
                   connectionStatus: ConnectionStatus.CONNECTED,
                   lastStateChange: new Date().toISOString(),
                 },
@@ -599,9 +425,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
-                  id: sessionId,
-                  isConnecting: false,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.DISCONNECTED,
                   lastStateChange: new Date().toISOString(),
                 },
@@ -614,9 +437,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
                 dispatch({
                   type: SessionActionType.UPDATE_SESSION,
                   payload: {
-                    id: sessionId,
-                    isConnecting: true,
-                    isConnected: false,
                     connectionStatus: ConnectionStatus.RECONNECTING, // using enum value here
                     lastStateChange: new Date().toISOString(),
                   },
@@ -633,29 +453,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
-                  id: sessionId,
-                  isConnecting: false,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.FAILED,
                   lastStateChange: new Date().toISOString(),
                 },
               });
-              dispatch({
-                type: SessionActionType.ADD_ERROR,
-                payload: {
-                  sessionId,
-                  error: {
-                    event_id: crypto.randomUUID(),
-                    related_event_id: null,
-                    param: null,
-                    type: 'connection_error',
-                    code: 'ice_connection_failed',
-                    message: 'ICE connection failed',
-                    timestamp: Date.now(),
-                  },
-                },
-              });
-              cleanupWebRTCResources(getSessionById(sessionId));
+              cleanupWebRTCResources();
               break;
 
             case 'closed':
@@ -666,14 +468,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               dispatch({
                 type: SessionActionType.UPDATE_SESSION,
                 payload: {
-                  id: sessionId,
-                  isConnecting: false,
-                  isConnected: false,
                   connectionStatus: ConnectionStatus.CLOSED,
                   lastStateChange: new Date().toISOString(),
                 },
               });
-              cleanupWebRTCResources(getSessionById(sessionId));
+              cleanupWebRTCResources();
               break;
 
             default:
@@ -685,22 +484,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         // Set ICE connection timeout remains as before
         iceTimeoutId = setTimeout(() => {
           logger.error(`ICE connection timeout for session '${sessionId}'`);
-          dispatch({
-            type: SessionActionType.ADD_ERROR,
-            payload: {
-              sessionId,
-              error: {
-                event_id: crypto.randomUUID(),
-                related_event_id: null,
-                param: null,
-                type: 'connection_error',
-                code: 'ice_connection_timeout',
-                message: 'ICE connection timed out',
-                timestamp: Date.now(),
-              },
-            },
-          });
-          cleanupWebRTCResources(getSessionById(sessionId));
+          cleanupWebRTCResources();
         }, 30000); // 30 second timeout
       };
 
@@ -710,27 +494,12 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       // Create data channel
       const dc = pc.createDataChannel(sessionId);
 
-      // Add session to state
-      dispatch({
-        type: SessionActionType.ADD_SESSION,
-        payload: {
-          ...realtimeSession,
-          peer_connection: pc,
-          dataChannel: dc,
-          tokenRef: realtimeSession?.client_secret?.value,
-          isConnecting: true,
-          isConnected: false,
-          startTime: new Date().toISOString(),
-        } as RealtimeSession,
-      });
-
       pc.onnegotiationneeded = async () => {
         try {
           logger.info(`Negotiation needed for session '${sessionId}'`);
 
-          // Create offer with explicit audio
           const offer = await pc.createOffer({
-            offerToReceiveAudio: true, // Explicitly request audio
+            offerToReceiveAudio: true,
           });
 
           logger.info('Generated offer SDP:', { sessionId, offer: offer.sdp }); // Debug log
@@ -782,16 +551,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       pc.ontrack = (event) => {
         logger.info(`Remote stream received for session '${sessionId}'.`);
         event.track.onended = () => {
-          const session = getSessionById(sessionId);
           if (session) {
-            cleanupWebRTCResources(session);
+            cleanupWebRTCResources();
           }
         };
 
         dispatch({
           type: SessionActionType.UPDATE_SESSION,
           payload: {
-            id: sessionId,
             mediaStream: event.streams[0],
           },
         });
@@ -802,11 +569,10 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         dispatch({
           type: SessionActionType.UPDATE_SESSION,
           payload: {
-            id: sessionId,
-            isConnecting: false,
-            isConnected: true,
-          } as RealtimeSession,
+            connectionStatus: ConnectionStatus.CONNECTED,
+          },
         });
+
         logger.info(`Data channel for session '${sessionId}' is open.`);
       });
 
@@ -827,7 +593,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             dispatch({
               type: SessionActionType.ADD_TRANSCRIPT,
               payload: {
-                sessionId,
                 transcript: {
                   content: event.transcript,
                   timestamp: Date.now(),
@@ -845,7 +610,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             dispatch({
               type: SessionActionType.ADD_TRANSCRIPT,
               payload: {
-                sessionId,
                 transcript: {
                   content: event.transcript,
                   timestamp: Date.now(),
@@ -855,20 +619,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               },
             });
             break;
-          /**
-           * Trigger when an error occurs during processing.
-           * This event provides information about the error that occurred.
-           */
-          case RealtimeEventType.ERROR:
-            dispatch({
-              type: SessionActionType.ADD_ERROR,
-              payload: {
-                sessionId,
-                error: event.error,
-              },
-            });
-            break;
-
           case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
             const responseEvent = event as ResponseOutputItemDoneEvent;
             // Check if it's a function call
@@ -890,7 +640,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               dispatch({
                 type: SessionActionType.UPDATE_TOKEN_USAGE,
                 payload: {
-                  sessionId,
                   tokenUsage: {
                     inputTokens: usage.input_tokens,
                     outputTokens: usage.output_tokens,
@@ -917,7 +666,6 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             dispatch({
               type: SessionActionType.UPDATE_RATE_LIMITS,
               payload: {
-                sessionId,
                 rateLimits: rateLimitsEvent.rate_limits,
                 rateLimitResetTime: resetTime,
                 isRateLimited,
@@ -926,21 +674,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
             // If rate limited, add an error
             if (isRateLimited) {
-              dispatch({
-                type: SessionActionType.ADD_ERROR,
-                payload: {
-                  sessionId,
-                  error: {
-                    event_id: crypto.randomUUID(),
-                    type: 'rate_limit_error',
-                    code: WebRTCErrorCode.RATE_LIMIT_EXCEEDED,
-                    message: 'Rate limit exceeded',
-                    param: null,
-                    related_event_id: event.event_id || null,
-                    timestamp: Date.now(),
-                  },
-                },
-              });
+              logger.error(`Rate limit exceeded for session '${sessionId}'`);
             }
             break;
 
@@ -951,10 +685,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
       dc.addEventListener('close', () => {
         logger.info(`Session '${sessionId}' closed.`);
-        dispatch({
-          type: SessionActionType.REMOVE_SESSION,
-          payload: { id: sessionId },
-        });
+        disconnect();
       });
     } catch (error: unknown) {
       logger.error(`Failed to start session '${sessionId}':`, {
@@ -974,18 +705,15 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
    *
    * @param sessionId - The unique identifier of the session to close.
    */
-  const closeSession = (
-    sessionId: string,
+  const disconnect = (
     options: SessionCloseOptions = { removeAfterConnectionClose: true }
   ): void => {
-    const session = getSessionById(sessionId);
     if (!session) {
-      logger.warn(`Session with ID '${sessionId}' does not exist.`);
       return;
     }
 
-    cleanupWebRTCResources(session);
-
+    cleanupWebRTCResources();
+    const sessionId = session.id;
     const endTime = new Date().toISOString();
     const startTimeMs = session.startTime
       ? new Date(session.startTime).getTime()
@@ -997,21 +725,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     dispatch({
       type: SessionActionType.UPDATE_SESSION,
       payload: {
-        id: sessionId,
-        isConnecting: false,
-        isConnected: false,
+        connectionStatus: ConnectionStatus.CLOSED,
         endTime,
         duration,
       },
     });
-
-    // Only remove the session if explicitly requested
-    if (options.removeAfterConnectionClose) {
-      dispatch({
-        type: SessionActionType.REMOVE_SESSION,
-        payload: { id: sessionId },
-      });
-    }
 
     logger.info(
       `Session '${sessionId}' connection closed. Duration: ${duration}s. Session ${
@@ -1026,16 +744,13 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
    * @param sessionId - The unique identifier of the session to send the event to.
    * @param event - The event object to be sent.
    */
-  const sendClientEvent = (sessionId: string, event: RealtimeEvent): void => {
-    // Find the session by ID
-    const session = sessions.find((s) => s.id === sessionId);
-
+  const sendClientEvent = (event: RealtimeEvent): void => {
     if (!session) {
-      logger.error(`Session with ID '${sessionId}' does not exist.`);
       return;
     }
 
     const { dataChannel } = session;
+    const sessionId = session.id;
 
     // Ensure the data channel is open before sending the event
     if (!dataChannel || dataChannel.readyState !== 'open') {
@@ -1065,11 +780,9 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
 
   /**
    * Sends a text message to a specific WebRTC session.
-   *
-   * @param sessionId - The unique identifier of the session to send the message to.
    * @param message - The text message to be sent.
    */
-  const sendTextMessage = (sessionId: string, message: string): void => {
+  const sendTextMessage = (message: string): void => {
     // Create the conversation item creation event
     const userEvent: ConversationItemCreateEvent = {
       type: RealtimeEventType.CONVERSATION_ITEM_CREATE,
@@ -1087,18 +800,14 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     };
 
     // Send the user message event
-    sendClientEvent(sessionId, userEvent);
+    sendClientEvent(userEvent);
   };
 
   /**
    * Creates a new response - Typically used for non VAD sessions.
-   * @param sessionId - The unique identifier of the session to send the response to.
    * @param response - The response object to be sent.
    */
-  const createResponse = (
-    sessionId: string,
-    response: ResponseCreateBody = {}
-  ): void => {
+  const createResponse = (response: ResponseCreateBody = {}): void => {
     // Create the response creation event
     const responseEvent: ResponseCreateEvent = {
       type: RealtimeEventType.RESPONSE_CREATE,
@@ -1107,7 +816,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     };
 
     // Send the response creation event
-    sendClientEvent(sessionId, responseEvent);
+    sendClientEvent(responseEvent);
   };
 
   /**
@@ -1116,48 +825,45 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
    * @param sessionId - The unique identifier of the session to send the audio to.
    * @param audioData - The Base64-encoded audio chunk to be sent.
    */
-  const sendAudioChunk = (sessionId: string, audioData: string): void => {
+  const sendAudioChunk = (audioData: string): void => {
     const audioChunkEvent: InputAudioBufferAppendEvent = {
       type: RealtimeEventType.INPUT_AUDIO_BUFFER_APPEND,
       event_id: crypto.randomUUID(), // Generate a unique event ID
       audio: audioData,
     };
 
-    sendClientEvent(sessionId, audioChunkEvent);
+    sendClientEvent(audioChunkEvent);
   };
 
   /**
    * Commits the audio buffer for processing in a specific WebRTC session.
    *
-   * @param sessionId - The unique identifier of the session to commit the audio buffer for.
    */
-  const commitAudioBuffer = (sessionId: string): void => {
+  const commitAudioBuffer = (): void => {
     const commitEvent: InputAudioBufferCommitEvent = {
       type: RealtimeEventType.INPUT_AUDIO_BUFFER_COMMIT,
       event_id: crypto.randomUUID(), // Generate a unique event ID
     };
 
-    sendClientEvent(sessionId, commitEvent);
+    sendClientEvent(commitEvent);
   };
 
-  const muteSessionAudio = (sessionId: string): void => {
+  const muteSessionAudio = (): void => {
     dispatch({
       type: SessionActionType.MUTE_SESSION_AUDIO,
-      payload: { sessionId },
     });
   };
 
-  const unmuteSessionAudio = (sessionId: string): void => {
+  const unmuteSessionAudio = (): void => {
     dispatch({
       type: SessionActionType.UNMUTE_SESSION_AUDIO,
-      payload: { sessionId },
     });
   };
 
   /**
    * Utility function to properly cleanup WebRTC resources
    */
-  const cleanupWebRTCResources = (session: RealtimeSession | null) => {
+  const cleanupWebRTCResources = useCallback(() => {
     if (!session) return;
 
     // Cleanup media tracks
@@ -1198,29 +904,26 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     session.mediaStream = null;
     session.dataChannel = null;
     session.peer_connection = null;
-  };
+  }, [session]);
 
   // Handle cleanup on page unload
   useEffect(() => {
     const handleBeforeUnload = () => {
-      sessions.forEach((session) => {
-        cleanupWebRTCResources(session);
-      });
+      cleanupWebRTCResources();
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [sessions]);
+  }, [session, cleanupWebRTCResources]);
 
   return (
     <OpenAIRealtimeWebRTCContext.Provider
       value={{
-        sessions,
-        getSessionById,
-        startSession,
-        closeSession,
+        session,
+        connect,
+        disconnect,
         sendTextMessage,
         sendClientEvent,
         sendAudioChunk,

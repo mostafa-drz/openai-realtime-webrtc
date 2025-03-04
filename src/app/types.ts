@@ -876,16 +876,6 @@ export interface RealtimeSession {
   dataChannel?: RTCDataChannel | null;
 
   /**
-   * Indicates whether the session is in the process of being established.
-   */
-  isConnecting?: boolean;
-
-  /**
-   * Indicates whether the session is successfully connected and ready for use.
-   */
-  isConnected?: boolean;
-
-  /**
    * The local media stream used for audio output.
    */
   mediaStream?: MediaStream | null;
@@ -895,12 +885,6 @@ export interface RealtimeSession {
    * Each transcript includes details such as content, timestamp, type, and role.
    */
   transcripts: Transcript[];
-
-  /**
-   * List of errors that have occurred during this session.
-   * This array is updated whenever an error event is received.
-   */
-  errors?: SessionError[];
   /**
    * Tracks token usage statistics for the session.
    */
@@ -1114,7 +1098,7 @@ export type FunctionCallHandler = (
   args: Record<string, unknown>
 ) => void;
 
-export type StartSession = (
+export type Connect = (
   realtimeSession: RealtimeSession,
   functionCallHandler?: FunctionCallHandler
 ) => void;
