@@ -6,6 +6,7 @@ import React, {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
 } from 'react';
 import {
   Transcript,
@@ -30,8 +31,10 @@ import {
   RateLimitsUpdatedEvent,
   OpenAIRealtimeWebRTCProviderProps,
   Connect,
+  EventCallback,
 } from '../types';
 import { createNoopLogger } from '../utils/logger';
+import { EventEmitter } from '../utils/eventEmitter';
 
 /**
  * Context type definition for managing OpenAI Realtime WebRTC sessions.
@@ -89,6 +92,20 @@ interface OpenAIRealtimeWebRTCContextType {
    * @param response - The response object to be sent.
    */
   createResponse: (response?: ResponseCreateBody) => void;
+
+  /**
+   * Adds an event listener for a specific event type.
+   * @param eventType - The type of event to listen for.
+   * @param callback - The callback function to be called when the event occurs.
+   */
+  on: (eventType: RealtimeEventType, callback: EventCallback) => void;
+
+  /**
+   * Removes an event listener for a specific event type.
+   * @param eventType - The type of event to remove the listener for.
+   * @param callback - The callback function to be removed.
+   */
+  off: (eventType: RealtimeEventType, callback?: EventCallback) => void;
 }
 
 // Create the OpenAI Realtime WebRTC context
@@ -221,7 +238,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
   OpenAIRealtimeWebRTCProviderProps
 > = ({ config, children }) => {
   const [session, dispatch] = useReducer(sessionReducer, null);
-
+  const eventEmitter = useRef(new EventEmitter());
   const logger = config.logger || createNoopLogger();
 
   useEffect(() => {
@@ -237,8 +254,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
   }, [config, logger]);
 
   const connect: Connect = async (
-    realtimeSession: RealtimeSession,
-    functionCallHandler?: (name: string, args: Record<string, unknown>) => void
+    realtimeSession: RealtimeSession
+    // functionCallHandler?: (name: string, args: Record<string, unknown>) => void
   ): Promise<void> => {
     const sessionId = realtimeSession.id;
     let iceTimeoutId: NodeJS.Timeout | null = null;
@@ -565,109 +582,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         logger.info(`Data channel for session '${sessionId}' is open.`);
       });
 
-      dc.addEventListener('message', (e: MessageEvent<string>) => {
-        logger.info('Received message from data channel', {
-          sessionId,
-          data: e.data,
-        });
-        const event: RealtimeEvent = JSON.parse(
-          e.data
-        ) as unknown as RealtimeEvent;
-        switch (event.type) {
-          /**
-           * Triggered when an input audio transcription is completed.
-           * This event provides the final transcript for the user's audio input.
-           */
-          case RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED:
-            dispatch({
-              type: SessionActionType.ADD_TRANSCRIPT,
-              payload: {
-                transcript: {
-                  content: event.transcript,
-                  timestamp: Date.now(),
-                  type: TranscriptType.INPUT,
-                  role: ConversationRole.USER,
-                },
-              },
-            });
-            break;
-          /**
-           * Triggered when an assistant's audio response transcription is finalized.
-           * This event provides the final transcript for the assistant's audio output.
-           */
-          case RealtimeEventType.RESPONSE_AUDIO_TRANSCRIPT_DONE:
-            dispatch({
-              type: SessionActionType.ADD_TRANSCRIPT,
-              payload: {
-                transcript: {
-                  content: event.transcript,
-                  timestamp: Date.now(),
-                  type: TranscriptType.OUTPUT,
-                  role: ConversationRole.ASSISTANT,
-                },
-              },
-            });
-            break;
-          case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
-            // Check if it's a function call
-            if (event.item.type === ConversationItemType.FUNCTION_CALL) {
-              functionCallHandler?.(
-                event.item.name as string,
-                JSON.parse(event.item?.arguments || '{}')
-              );
-            }
-            break;
-
-          case RealtimeEventType.RESPONSE_DONE: {
-            const responseEvent = event as ResponseDoneEvent;
-            const usage = responseEvent.response?.usage;
-            if (usage) {
-              // Dispatch token usage to the reducer
-              dispatch({
-                type: SessionActionType.UPDATE_TOKEN_USAGE,
-                payload: {
-                  tokenUsage: {
-                    inputTokens: usage.input_tokens,
-                    outputTokens: usage.output_tokens,
-                    totalTokens: usage.total_tokens,
-                  },
-                },
-              });
-            }
-            break;
-          }
-
-          case RealtimeEventType.RATE_LIMITS_UPDATED: {
-            const rateLimitsEvent = event as RateLimitsUpdatedEvent;
-            const maxResetSeconds = Math.max(
-              ...rateLimitsEvent.rate_limits.map((limit) => limit.reset_seconds)
-            );
-            const resetTime = new Date(
-              Date.now() + maxResetSeconds * 1000
-            ).toISOString();
-            const isRateLimited = rateLimitsEvent.rate_limits.some(
-              (limit) => limit.remaining <= 0
-            );
-
-            dispatch({
-              type: SessionActionType.UPDATE_RATE_LIMITS,
-              payload: {
-                rateLimits: rateLimitsEvent.rate_limits,
-                rateLimitResetTime: resetTime,
-                isRateLimited,
-              },
-            });
-
-            // If rate limited, add an error
-            if (isRateLimited) {
-              logger.error(`Rate limit exceeded for session '${sessionId}'`);
-            }
-            break;
-          }
-          default:
-            break;
-        }
-      });
+      dc.addEventListener('message', handleDataChannelMessage);
 
       dc.addEventListener('close', () => {
         logger.info(`Session '${sessionId}' closed.`);
@@ -892,6 +807,120 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
     };
   }, [session, cleanupWebRTCResources]);
 
+  // Add event handling methods
+  const on = (eventType: RealtimeEventType, callback: EventCallback) => {
+    eventEmitter.current.on(eventType, callback);
+  };
+
+  const off = (eventType: RealtimeEventType, callback?: EventCallback) => {
+    eventEmitter.current.off(eventType, callback);
+  };
+
+  // Update the data channel message handler to emit events
+  const handleDataChannelMessage = (e: MessageEvent<string>) => {
+    try {
+      const event = JSON.parse(e.data) as RealtimeEvent;
+      // Emit the event before processing
+      eventEmitter.current.emit(event);
+
+      // Process the event for internal state management
+      switch (event.type) {
+        case RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED:
+          dispatch({
+            type: SessionActionType.ADD_TRANSCRIPT,
+            payload: {
+              transcript: {
+                content: event.transcript,
+                timestamp: Date.now(),
+                type: TranscriptType.INPUT,
+                role: ConversationRole.USER,
+              },
+            },
+          });
+          break;
+        case RealtimeEventType.RESPONSE_AUDIO_TRANSCRIPT_DONE:
+          dispatch({
+            type: SessionActionType.ADD_TRANSCRIPT,
+            payload: {
+              transcript: {
+                content: event.transcript,
+                timestamp: Date.now(),
+                type: TranscriptType.OUTPUT,
+                role: ConversationRole.ASSISTANT,
+              },
+            },
+          });
+          break;
+        case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
+          // Check if it's a function call
+          if (event.item.type === ConversationItemType.FUNCTION_CALL) {
+            // TODO: Fix function call handler
+            // config.functionCallHandler(
+            //   event.item.name as string,
+            //   JSON.parse(event.item?.arguments || '{}')
+            // );
+          }
+          break;
+        case RealtimeEventType.RESPONSE_DONE: {
+          const responseEvent = event as ResponseDoneEvent;
+          const usage = responseEvent.response?.usage;
+          if (usage) {
+            // Dispatch token usage to the reducer
+            dispatch({
+              type: SessionActionType.UPDATE_TOKEN_USAGE,
+              payload: {
+                tokenUsage: {
+                  inputTokens: usage.input_tokens,
+                  outputTokens: usage.output_tokens,
+                  totalTokens: usage.total_tokens,
+                },
+              },
+            });
+          }
+          break;
+        }
+        case RealtimeEventType.RATE_LIMITS_UPDATED: {
+          const rateLimitsEvent = event as RateLimitsUpdatedEvent;
+          const maxResetSeconds = Math.max(
+            ...rateLimitsEvent.rate_limits.map((limit) => limit.reset_seconds)
+          );
+          const resetTime = new Date(
+            Date.now() + maxResetSeconds * 1000
+          ).toISOString();
+          const isRateLimited = rateLimitsEvent.rate_limits.some(
+            (limit) => limit.remaining <= 0
+          );
+
+          dispatch({
+            type: SessionActionType.UPDATE_RATE_LIMITS,
+            payload: {
+              rateLimits: rateLimitsEvent.rate_limits,
+              rateLimitResetTime: resetTime,
+              isRateLimited,
+            },
+          });
+
+          // If rate limited, add an error
+          if (isRateLimited && session?.id) {
+            logger.error(`Rate limit exceeded for session '${session.id}'`);
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    } catch (error) {
+      logger.error('Error processing WebRTC message', { error });
+    }
+  };
+
+  // Cleanup listeners when unmounting
+  useEffect(() => {
+    return () => {
+      eventEmitter.current.removeAll();
+    };
+  }, []);
+
   return (
     <OpenAIRealtimeWebRTCContext.Provider
       value={{
@@ -903,6 +932,8 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         sendAudioChunk,
         commitAudioBuffer,
         createResponse,
+        on,
+        off,
       }}
     >
       {children}
