@@ -89,13 +89,6 @@ const ClientProvider = ({ children }: { children: React.ReactNode }) => {
       },
       connection_timeout: 10000,
     },
-    defaultAudioSettings: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      sampleRate: 48000,
-    },
-    defaultIceTimeout: 30000,
   };
 
   return (

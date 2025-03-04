@@ -39,6 +39,7 @@ Events are managed using a clear structure defined in `RealtimeEventType`, ensur
 - Dynamic session configuration updates
 - Transcript management for audio and text inputs
 - Rate limiting support with automatic tracking
+- Type-safe event subscription system with `on` and `off` methods
 
 ### Current Project Features
 
@@ -51,18 +52,21 @@ Events are managed using a clear structure defined in `RealtimeEventType`, ensur
 ## Getting Started
 
 1. **Clone the Repository**
+
    ```bash
    git clone https://github.com/your-username/openai-realtime-webrtc.git
    cd openai-realtime-webrtc
    ```
 
 2. **Install Dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set Up Environment Variables**
    Create a `.env.local` file:
+
    ```bash
    NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
    NEXT_PUBLIC_OPEN_AI_MODEL_ID=your_model_id
@@ -119,6 +123,61 @@ The OpenAI Realtime WebRTC Context Provider manages WebRTC sessions and interact
   sendTextMessage('Hello, how can you help me?');
   ```
 
-For implementation examples, refer to the [Chat Component](/src/app/components/Chat.tsx).
+#### Event Handling
+
+The context provides type-safe event handling capabilities through `on` and `off` methods:
+
+#### on(eventType: RealtimeEventType, callback: EventCallback): void
+
+- **Description**: Subscribes to specific WebRTC events
+- **Example**:
+  ```typescript
+  const { on } = useSession();
+  
+  useEffect(() => {
+    const handleAudioStart = (event) => {
+      console.log('Audio started:', event);
+    };
+    
+    on(RealtimeEventType.OUTPUT_AUDIO_STARTED, handleAudioStart);
+    
+    // Cleanup
+    return () => off(RealtimeEventType.OUTPUT_AUDIO_STARTED, handleAudioStart);
+  }, []);
+  ```
+
+#### off(eventType: RealtimeEventType, callback?: EventCallback): void
+
+- **Description**: Unsubscribes from specific WebRTC events
+- **Example**:
+  ```typescript
+  const { off } = useSession();
+  off(RealtimeEventType.OUTPUT_AUDIO_STARTED, handleAudioStart);
+  ```
+
+### Event Handling Example
+
+```typescript
+import { useSession } from '../context/OpenAIRealtimeWebRTC';
+import { RealtimeEventType } from '../types';
+
+const EventLogger = () => {
+  const { on, off } = useSession();
+
+  useEffect(() => {
+    const handleTranscription = (event) => {
+      console.log('Transcription completed:', event);
+    };
+
+    on(RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED, handleTranscription);
+
+    return () => {
+      off(RealtimeEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED, handleTranscription);
+    };
+  }, [on, off]);
+
+  return null;
+};
+```
 
 For a complete example of how to implement these features, including session management, audio controls, and voice selection, refer to the [Chat Component](/src/app/components/Chat.tsx).

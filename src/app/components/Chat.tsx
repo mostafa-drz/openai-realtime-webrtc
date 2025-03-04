@@ -20,6 +20,7 @@ import Transcripts from './Transcripts';
 import TokenUsage from './TokenUsage';
 import SessionInfo from './SessionInfo';
 import SessionsDebugger from './SessionsDebugger';
+import { EventLogger } from './EventLogger';
 
 // Add voice options based on OpenAI's available voices
 const VOICE_OPTIONS = {
@@ -172,6 +173,7 @@ const Chat: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 bg-white rounded-lg shadow-lg space-y-6">
+      <EventLogger />
       {/* Header Section */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
