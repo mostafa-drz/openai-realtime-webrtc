@@ -237,9 +237,40 @@ export const sessionReducer = (
 export const OpenAIRealtimeWebRTCProvider: React.FC<
   OpenAIRealtimeWebRTCProviderProps
 > = ({ config, children }) => {
+  // Validate required config
+  if (!config.realtimeApiUrl) {
+    throw new Error(
+      'realtimeApiUrl is required in OpenAIRealtimeContextConfig'
+    );
+  }
+  if (!config.modelId) {
+    throw new Error('modelId is required in OpenAIRealtimeContextConfig');
+  }
+
+  // Initialize with defaults
+  const defaultConfig = {
+    defaultIceTimeout: 30000, // 30 seconds
+    defaultAudioSettings: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 48000,
+    },
+    logger: createNoopLogger(),
+  };
+
+  // Merge with provided config, keeping defaults if not provided
+  const mergedConfig = {
+    ...defaultConfig,
+    ...config,
+    // Only merge audio settings if provided
+    defaultAudioSettings:
+      config.defaultAudioSettings ?? defaultConfig.defaultAudioSettings,
+  };
+
   const [session, dispatch] = useReducer(sessionReducer, null);
   const eventEmitter = useRef(new EventEmitter());
-  const logger = config.logger || createNoopLogger();
+  const logger = mergedConfig.logger;
 
   useEffect(() => {
     logger.info('OpenAIRealtimeWebRTCProvider initialized', {
@@ -268,18 +299,16 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
         iceServers: [], // OpenAI handles this
       });
 
-      // Use config audio settings if provided
-      const audioSettings = realtimeSession.audioSettings ||
-        config.defaultAudioSettings || {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-        };
+      // Use session audio settings if provided, otherwise use config default
+      const audioSettings =
+        realtimeSession.audioSettings ?? mergedConfig.defaultAudioSettings;
 
-      // Get user media if audio modality is required
+      // Get user media if audio modality is required and we have audio settings
       let localStream: MediaStream | undefined;
-      if (realtimeSession.modalities?.includes(Modality.AUDIO)) {
+      if (
+        realtimeSession.modalities?.includes(Modality.AUDIO) &&
+        audioSettings
+      ) {
         try {
           localStream = await navigator.mediaDevices.getUserMedia({
             audio: audioSettings,
@@ -330,7 +359,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             offer,
           });
           const response = await fetch(
-            `${config.realtimeApiUrl}?model=${config.modelId}`,
+            `${mergedConfig.realtimeApiUrl}?model=${mergedConfig.modelId}`,
             {
               method: 'POST',
               body: offer.sdp,
@@ -383,7 +412,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
       };
 
       // Set ICE timeout from config
-      const iceTimeout = config.defaultIceTimeout || 30000;
+      const iceTimeout = mergedConfig.defaultIceTimeout || 30000;
       iceTimeoutId = setTimeout(() => {
         if (pc.iceConnectionState !== 'connected') {
           logger.error(`ICE connection timeout for session '${sessionId}'`);
@@ -513,7 +542,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
           await pc.setLocalDescription(offer);
 
           const response = await fetch(
-            `${config.realtimeApiUrl}?model=${config.modelId}`,
+            `${mergedConfig.realtimeApiUrl}?model=${mergedConfig.modelId}`,
             {
               method: 'POST',
               body: offer.sdp,
