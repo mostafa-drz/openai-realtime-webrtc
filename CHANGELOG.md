@@ -1,3 +1,34 @@
+## [2.0.0] - 2024-03-03
+
+### Breaking Changes
+- Removed audio control from WebRTC context (mute/unmute functionality)
+- Refactored session management from multi-session to single-session architecture
+- Renamed session methods for clarity:
+  - `startSession` → `connect`
+  - `closeSession` → `disconnect`
+- Updated connection status handling with new ConnectionStatus enum
+
+### Added
+- Configuration panel for API settings
+- Sessions debugger with JSON viewer
+- Rate limiting support with automatic handling
+- Enhanced WebRTC configuration constants
+- Development tooling:
+  - ESLint and Prettier configuration
+  - Husky pre-commit hooks
+  - Lint-staged for automated code quality
+
+### Changed
+- Improved error handling and state management
+- Enhanced TypeScript configuration
+- Updated build configuration with next.config.mjs
+- Simplified WebRTCPlayer component
+- Improved documentation for WebRTC integration
+
+### Removed
+- Audio control functionality from core WebRTC context
+- Multi-session support in favor of single-session architecture
+
 ## [1.2.0] - 2024-02-07
 
 ### Added

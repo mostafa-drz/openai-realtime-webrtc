@@ -2,6 +2,8 @@
 
 The OpenAI Realtime API enables real-time, multi-modal interactions using WebRTC. This project demonstrates how to leverage the API to build interactive applications with support for audio streaming, text input, and session management. The focus is on providing low-latency interactions using a client-friendly architecture.
 
+![Initial Chat Interface](/public/version2.0.0//screenshot1.png)
+
 ### Key Components of the Integration
 
 #### Ephemeral Token Authentication
@@ -15,153 +17,106 @@ A WebRTC peer connection is established between the client application and the O
 - **Audio Streaming**: Microphone input is streamed to the API in real time, and audio responses are seamlessly played back on the client side.
 - **Data Channel Communication**: A dedicated data channel is used to send and receive structured events, such as text inputs, session configuration updates, and transcription results.
 
-#### Session Management and Multi-Session Support
+![Active Chat Session](/public/version2.0.0/screenshot2.png)
 
-- **Reducer-Based State Management**: This project uses a centralized reducer to manage session states and transcripts, ensuring scalability and clarity when handling multiple sessions.
-- **Real-Time Transcripts**: The integration focuses on capturing audio transcripts (finalized) and updating them in real time. Developers can retrieve transcripts for user inputs and AI responses, enhancing application interactivity.
+#### Session Management
+
+- **Single-Session Architecture**: The project uses a simplified single-session approach, making it easier to manage state and handle connections.
+- **Connection Status Management**: Comprehensive tracking of connection states (connecting, connected, disconnected, etc.) with automatic reconnection handling.
+- **Real-Time Transcripts**: Captures and updates transcripts in real time for both user inputs and AI responses.
+
+### Development and Debugging
+
+The application includes a built-in session debugger that provides real-time insight into the WebRTC session state, configuration, and connection status.
+
+![Session Debugger](/public/version2.0.0/screenshot3.png)
 
 ### Event Handling and Dynamic Configuration
 
-Events are managed using a clear structure defined in a `RealtimeEventType` enum, ensuring consistency and maintainability. This includes:
+Events are managed using a clear structure defined in `RealtimeEventType`, ensuring consistency and maintainability. This includes:
 
-- Capturing audio input and output events.
-- Dynamically updating session configurations (e.g., changing transcription models or modalities).
-- Managing finalized transcripts for both audio and text inputs via a structured `Transcript` type.
+- Audio input and output event handling
+- Dynamic session configuration updates
+- Transcript management for audio and text inputs
+- Rate limiting support with automatic tracking
 
-### Why WebRTC?
+### Current Project Features
 
-WebRTC is particularly suited for real-time, interactive applications due to its ability to handle:
-
-- **Low-Latency Media Streaming**: Essential for audio-based AI interactions.
-- **Dynamic Network Adjustments**: Optimizes performance based on varying bandwidth conditions.
-- **Rich Session Management**: Allows seamless communication with the OpenAI Realtime API via data channels.
-
-### Current Project Highlights
-
-- **Multi-Session Support**: Developers can create, manage, and close multiple sessions in parallel.
-- **Real-Time Transcript Updates**: Captures and organizes finalized audio transcripts for user and AI interactions.
+- **Robust Connection Management**: Handles connection lifecycle with automatic reconnection attempts
+- **Rate Limiting Support**: Built-in rate limit tracking and management
+- **Flexible Audio Controls**: Support for both Voice Activity Detection (VAD) and Push-to-Talk modes
+- **Voice Selection**: Multiple AI voice options for responses
+- **Development Tools**: Built-in debugging and session monitoring capabilities
 
 ## Getting Started
 
-1.  **Clone the Repository**
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/your-username/openai-realtime-webrtc.git
+   cd openai-realtime-webrtc
+   ```
 
-    Start by cloning the repository to your local machine:
+2. **Install Dependencies**
+   ```bash
+   npm install
+   ```
 
-    ```bash
-    git clone https://github.com/your-username/openai-realtime-webrtc.git
-    cd openai-realtime-webrtc
-    ```
+3. **Set Up Environment Variables**
+   Create a `.env.local` file:
+   ```bash
+   NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
+   NEXT_PUBLIC_OPEN_AI_MODEL_ID=your_model_id
+   ```
 
-2.  **Install Dependencies**
+4. **Run the Development Server**
+   ```bash
+   npm run dev
+   ```
 
-    Ensure that you have all the necessary dependencies installed:
+## OpenAI Realtime WebRTC Context Provider
 
-    ```bash
-    npm install
-    ```
+The OpenAI Realtime WebRTC Context Provider manages WebRTC sessions and interactions with the OpenAI Realtime API. It exposes the following key functions through the `useSession` hook:
 
-3.  **Set Up Environment Variables**
+### Context API Overview
 
-    Create a `.env.local` file in the root of the project and add the following variables:
+#### session
 
-    ```bash
-    NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
-    NEXT_PUBLIC_OPEN_AI_MODEL_ID=your_model_id
-    ```
+- **Description**: The current active WebRTC session state
+- **Type**: `RealtimeSession | null`
+- **Example**:
+  ```typescript
+  const { session } = useSession();
+  console.log(session?.connectionStatus); // Logs current connection status
+  ```
 
-    Replace `your_openai_api_key` with your OpenAI API key.  
-    Replace `your_model_id` with the appropriate model ID (e.g., `gpt-4o-realtime-preview`).
+#### connect(realtimeSession: RealtimeSession, functionCallHandler?: FunctionCallHandler): Promise<void>
 
-4.  **Run the Development Server**
+- **Description**: Establishes a new WebRTC session with the OpenAI Realtime API
+- **Example**:
+  ```typescript
+  const sessionConfig = {
+    id: 'sess_123',
+    modalities: [Modality.TEXT, Modality.AUDIO],
+    model: 'gpt-4-realtime',
+    // ... other configuration
+  };
+  await connect(sessionConfig);
+  ```
 
-    Start the Next.js development server:
+#### disconnect(): void
 
-        ```bash
-        npm run dev
-        ```
+- **Description**: Closes the active WebRTC session and cleans up resources
+- **Example**:
+  ```typescript
+  disconnect();
+  ```
 
-        You can now access the application by visiting [http://localhost:3000](http://localhost:3000) in your browser.
+#### sendTextMessage(message: string): void
 
-    ## OpenAI Realtime WebRTC Context Provider
+- **Description**: Sends a text message through the active session
+- **Example**:
+  ```typescript
+  sendTextMessage('Hello, how can you help me?');
+  ```
 
-    The OpenAI Realtime WebRTC Context Provider is the core utility for managing WebRTC sessions, transcripts, and interactions with the OpenAI Realtime API. It exposes a set of functions and state to developers, enabling seamless integration for building multi-modal AI-driven applications.
-
-    ### Context API Overview
-
-    The context exports the following key functions and state through the `useOpenAIRealtimeWebRTC` hook:
-
-    #### sessions
-
-    - **Description**: A list of all active WebRTC sessions, each represented by a `RealtimeSession` object.
-    - **Type**: `RealtimeSession[]`
-    - **Example**:
-      ```typescript
-      const { sessions } = useOpenAIRealtimeWebRTC();
-      console.log(sessions); // Logs all active sessions
-      ```
-
-    #### getSessionById(sessionId: string): RealtimeSession | null
-
-    - **Description**: Retrieves the state of a specific session by its ID.
-    - **Example**:
-      ```typescript
-      const session = getSessionById('sess_123');
-      if (session) {
-        console.log(session.transcripts); // Access transcripts for this session
-      }
-      ```
-
-    #### startSession(realtimeSession: RealtimeSession): Promise<void>
-
-    - **Description**: Starts a new WebRTC session with the OpenAI Realtime API, establishing the WebRTC peer connection and data channel.
-    - **Parameters**:
-      - `realtimeSession`: A `RealtimeSession` object containing configuration details.
-    - **Example**:
-      ```typescript
-      const sessionConfig: RealtimeSession = {
-        id: 'sess_123',
-        modalities: [Modality.TEXT, Modality.AUDIO],
-        model: 'gpt-4-realtime',
-        transcripts: [],
-      };
-      await startSession(sessionConfig);
-      ```
-
-    #### closeSession(sessionId: string): void
-
-    - **Description**: Closes an active WebRTC session, cleans up the peer connection and data channel, and removes the session from state.
-    - **Example**:
-      ```typescript
-      closeSession('sess_123');
-      ```
-
-    #### sendTextMessage(sessionId: string, message: string): void
-
-    - **Description**: Sends a text message to a specific session over the WebRTC data channel.
-    - **Parameters**:
-      - `sessionId`: The unique identifier of the session to send the message to.
-      - `message`: The text message to be sent.
-    - **Example**:
-      ```typescript
-      sendTextMessage('sess_123', 'Hello, how can you help me?');
-      ```
-
-    #### sendClientEvent(sessionId: string, event: RealtimeEvent): void
-
-    - **Description**: Sends a custom client event to a specific session.
-    - **Parameters**:
-      - `sessionId`: The unique identifier of the session to send the event to.
-      - `event`: A `RealtimeEvent` object.
-    - **Example**:
-      ```typescript
-      const customEvent: RealtimeEvent = {
-        type: RealtimeEventType.RESPONSE_CREATED,
-        event_id: 'event_123',
-        timestamp: Date.now(),
-      };
-      sendClientEvent('sess_123', customEvent);
-      ```
-
-    For more details, refer to the [Context Provider Code](/src/app/context/OpenAIRealtimeWebRTC.tsx).
-
-    You can also check out an example usage in the [Chat Component](/src/app/components/Chat.tsx).
+For a complete example of how to implement these features, including session management, audio controls, and voice selection, refer to the [Chat Component](/src/app/components/Chat.tsx).
