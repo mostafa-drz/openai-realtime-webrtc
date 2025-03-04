@@ -1194,7 +1194,7 @@ export interface OpenAIRealtimeContextConfig {
   /**
    * Default audio settings to be used across all sessions
    */
-  defaultAudioSettings?: AudioSettings;
+  defaultAudioSettings?: AudioSettings | null;
 
   /**
    * Logger instance for logging session events
@@ -1239,3 +1239,5 @@ export interface Logger {
   warn(message: string, meta?: { [key: string]: unknown }): void;
   error(message: string, meta?: { [key: string]: unknown }): void;
 }
+
+export type EventCallback = (event: RealtimeEvent) => void;

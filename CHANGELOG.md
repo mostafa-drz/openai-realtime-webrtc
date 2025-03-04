@@ -1,6 +1,24 @@
+## [2.1.0] - 2024-03-04
+
+### Added
+- Event system with EventEmitter for WebRTC events
+- Type-safe event handling with `on` and `off` methods
+- EventLogger component for debugging WebRTC events
+
+### Changed
+- Improved config validation with required field checks
+- Enhanced audio settings fallback logic
+- Refined default configuration handling
+- Added proper type safety for optional configurations
+
+### Fixed
+- Audio settings inheritance from default config
+- Config validation for required fields (realtimeApiUrl, modelId)
+
 ## [2.0.0] - 2024-03-03
 
 ### Breaking Changes
+
 - Removed audio control from WebRTC context (mute/unmute functionality)
 - Refactored session management from multi-session to single-session architecture
 - Renamed session methods for clarity:
@@ -9,6 +27,7 @@
 - Updated connection status handling with new ConnectionStatus enum
 
 ### Added
+
 - Configuration panel for API settings
 - Sessions debugger with JSON viewer
 - Rate limiting support with automatic handling
@@ -19,6 +38,7 @@
   - Lint-staged for automated code quality
 
 ### Changed
+
 - Improved error handling and state management
 - Enhanced TypeScript configuration
 - Updated build configuration with next.config.mjs
@@ -26,6 +46,7 @@
 - Improved documentation for WebRTC integration
 
 ### Removed
+
 - Audio control functionality from core WebRTC context
 - Multi-session support in favor of single-session architecture
 
