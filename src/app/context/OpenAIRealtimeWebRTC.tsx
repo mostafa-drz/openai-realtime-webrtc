@@ -21,7 +21,6 @@ import {
   ConversationItemCreateEvent,
   ConversationItemType,
   ContentType,
-  ResponseOutputItemDoneEvent,
   TokenUsage,
   ResponseDoneEvent,
   Modality,
@@ -610,14 +609,11 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             });
             break;
           case RealtimeEventType.RESPONSE_OUTPUT_ITEM_DONE:
-            const responseEvent = event as ResponseOutputItemDoneEvent;
             // Check if it's a function call
-            if (
-              responseEvent.item.type === ConversationItemType.FUNCTION_CALL
-            ) {
+            if (event.item.type === ConversationItemType.FUNCTION_CALL) {
               functionCallHandler?.(
-                responseEvent.item.name as string,
-                JSON.parse(responseEvent.item?.arguments || '{}')
+                event.item.name as string,
+                JSON.parse(event.item?.arguments || '{}')
               );
             }
             break;
@@ -641,7 +637,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
             break;
           }
 
-          case RealtimeEventType.RATE_LIMITS_UPDATED:
+          case RealtimeEventType.RATE_LIMITS_UPDATED: {
             const rateLimitsEvent = event as RateLimitsUpdatedEvent;
             const maxResetSeconds = Math.max(
               ...rateLimitsEvent.rate_limits.map((limit) => limit.reset_seconds)
@@ -667,7 +663,7 @@ export const OpenAIRealtimeWebRTCProvider: React.FC<
               logger.error(`Rate limit exceeded for session '${sessionId}'`);
             }
             break;
-
+          }
           default:
             break;
         }
