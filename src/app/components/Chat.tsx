@@ -174,7 +174,6 @@ const Chat: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 bg-white rounded-lg shadow-lg space-y-6">
-      <SessionsDebugger />
       {/* Header Section */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -292,6 +291,7 @@ const Chat: React.FC = () => {
             />
           )}
         </div>
+        <SessionsDebugger />
       </div>
     </div>
   );
