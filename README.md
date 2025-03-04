@@ -51,18 +51,21 @@ Events are managed using a clear structure defined in `RealtimeEventType`, ensur
 ## Getting Started
 
 1. **Clone the Repository**
+
    ```bash
    git clone https://github.com/your-username/openai-realtime-webrtc.git
    cd openai-realtime-webrtc
    ```
 
 2. **Install Dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set Up Environment Variables**
    Create a `.env.local` file:
+
    ```bash
    NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
    NEXT_PUBLIC_OPEN_AI_MODEL_ID=your_model_id

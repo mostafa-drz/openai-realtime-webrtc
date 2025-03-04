@@ -1239,3 +1239,5 @@ export interface Logger {
   warn(message: string, meta?: { [key: string]: unknown }): void;
   error(message: string, meta?: { [key: string]: unknown }): void;
 }
+
+export type EventCallback = (event: RealtimeEvent) => void;
