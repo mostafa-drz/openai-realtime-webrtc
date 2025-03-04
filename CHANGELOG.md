@@ -1,3 +1,20 @@
+## [2.1.0] - 2024-03-04
+
+### Added
+- Event system with EventEmitter for WebRTC events
+- Type-safe event handling with `on` and `off` methods
+- EventLogger component for debugging WebRTC events
+
+### Changed
+- Improved config validation with required field checks
+- Enhanced audio settings fallback logic
+- Refined default configuration handling
+- Added proper type safety for optional configurations
+
+### Fixed
+- Audio settings inheritance from default config
+- Config validation for required fields (realtimeApiUrl, modelId)
+
 ## [2.0.0] - 2024-03-03
 
 ### Breaking Changes
