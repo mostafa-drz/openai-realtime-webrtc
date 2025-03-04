@@ -119,6 +119,4 @@ The OpenAI Realtime WebRTC Context Provider manages WebRTC sessions and interact
   sendTextMessage('Hello, how can you help me?');
   ```
 
-For implementation examples, refer to the [Chat Component](/src/app/components/Chat.tsx).
-
 For a complete example of how to implement these features, including session management, audio controls, and voice selection, refer to the [Chat Component](/src/app/components/Chat.tsx).
