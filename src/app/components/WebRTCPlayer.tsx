@@ -4,17 +4,9 @@ import React, { useEffect, useRef } from 'react';
 
 interface WebRTCPlayerProps {
   remoteStream: MediaStream | null;
-  isMuted: boolean;
-  onMute: () => void;
-  onUnmute: () => void;
 }
 
-const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
-  remoteStream,
-  isMuted,
-  onMute,
-  onUnmute,
-}) => {
+const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({ remoteStream }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -81,28 +73,14 @@ const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     }
   }, [remoteStream]);
 
-  const handleMuteClick = () => {
-    if (isMuted) {
-      onUnmute();
-    } else {
-      onMute();
-    }
-  };
-
   if (!remoteStream) {
     return null;
   }
 
   return (
     <div>
-      <audio ref={audioRef} autoPlay controls={false} muted={isMuted} />
+      <audio ref={audioRef} autoPlay controls={false} />
       <canvas ref={canvasRef} className="w-full h-64 border rounded shadow" />
-      <button
-        onClick={handleMuteClick}
-        className="mt-2 p-2 bg-blue-500 text-white rounded"
-      >
-        {isMuted ? 'Unmute' : 'Mute'}
-      </button>
     </div>
   );
 };
