@@ -9,6 +9,8 @@ import {
   TranscriptionSessionConfig,
   SessionResponse,
   Conversation,
+  LogProbability,
+  TranscriptionError,
 } from './core';
 
 /**
@@ -45,6 +47,12 @@ export enum ServerEventType {
   ERROR = 'error',
   /** A new conversation has been created */
   CONVERSATION_CREATED = 'conversation.created',
+  /** Audio transcription has completed */
+  CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED = 'conversation.item.input_audio_transcription.completed',
+  /** Audio transcription delta */
+  CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_DELTA = 'conversation.item.input_audio_transcription.delta',
+  /** Audio transcription failed */
+  CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_FAILED = 'conversation.item.input_audio_transcription.failed',
 }
 
 /**
@@ -225,6 +233,55 @@ export interface ConversationCreatedEvent {
 }
 
 /**
+ * Event indicating audio transcription has completed
+ */
+export interface ConversationItemInputAudioTranscriptionCompletedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED;
+  /** ID of the user message item containing the audio */
+  item_id: string;
+  /** Index of the content part containing the audio */
+  content_index: number;
+  /** The transcribed text */
+  transcript: string;
+  /** The log probabilities of the transcription */
+  logprobs: LogProbability[] | null;
+}
+
+/**
+ * Event indicating a delta update to audio transcription
+ */
+export interface ConversationItemInputAudioTranscriptionDeltaEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_DELTA;
+  /** ID of the item */
+  item_id: string;
+  /** Index of the content part in the item's content array */
+  content_index: number;
+  /** The text delta */
+  delta: string;
+  /** The log probabilities of the transcription */
+  logprobs: LogProbability[] | null;
+}
+
+/**
+ * Event indicating audio transcription has failed
+ */
+export interface ConversationItemInputAudioTranscriptionFailedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_FAILED;
+  /** ID of the user message item */
+  item_id: string;
+  /** Index of the content part containing the audio */
+  content_index: number;
+  /** Details of the transcription error */
+  error: TranscriptionError;
+}
+
+/**
  * Union type for all server events
  */
 export type ServerEvent =
@@ -242,4 +299,7 @@ export type ServerEvent =
   | ResponseCancelledEvent
   | OutputAudioBufferClearedEvent
   | ConversationCreatedEvent
+  | ConversationItemInputAudioTranscriptionCompletedEvent
+  | ConversationItemInputAudioTranscriptionDeltaEvent
+  | ConversationItemInputAudioTranscriptionFailedEvent
   | ErrorEvent;

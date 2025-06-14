@@ -342,3 +342,29 @@ export interface Conversation {
   id: string;
   object: ObjectType.CONVERSATION;
 }
+
+/**
+ * Log probability for a token in transcription
+ */
+export interface LogProbability {
+  /** The bytes that were used to generate the log probability */
+  bytes: number[];
+  /** The log probability of the token */
+  logprob: number;
+  /** The token that was used to generate the log probability */
+  token: string;
+}
+
+/**
+ * Transcription error details
+ */
+export interface TranscriptionError {
+  /** Type of transcription error */
+  type: 'transcription_error';
+  /** Error code */
+  code: string;
+  /** Error message */
+  message: string;
+  /** Parameter that caused the error if applicable */
+  param: string | null;
+}
