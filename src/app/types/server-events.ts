@@ -25,6 +25,10 @@ export enum ServerEventType {
   INPUT_AUDIO_BUFFER_COMMITTED = 'input_audio_buffer.committed',
   /** Input audio buffer has been cleared */
   INPUT_AUDIO_BUFFER_CLEARED = 'input_audio_buffer.cleared',
+  /** Input audio buffer speech started */
+  INPUT_AUDIO_BUFFER_SPEECH_STARTED = 'input_audio_buffer.speech_started',
+  /** Input audio buffer speech stopped */
+  INPUT_AUDIO_BUFFER_SPEECH_STOPPED = 'input_audio_buffer.speech_stopped',
   /** A new conversation item has been created */
   CONVERSATION_ITEM_CREATED = 'conversation.item.created',
   /** A conversation item has been retrieved */
@@ -123,20 +127,58 @@ export interface TranscriptionSessionUpdatedEvent {
 
 /**
  * Event indicating input audio buffer has been committed
+ * This event is sent when the buffer is committed either by the client or automatically in server VAD mode.
+ * A conversation.item.created event will follow with the user message item.
  */
 export interface InputAudioBufferCommittedEvent {
   /** Optional event ID for tracking */
   event_id: EventId;
   type: ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED;
+  /** ID of the user message item that will be created */
+  item_id: string;
+  /** ID of the preceding item after which the new item will be inserted */
+  previous_item_id: string;
 }
 
 /**
  * Event indicating input audio buffer has been cleared
+ * This event is sent when the client clears the buffer with input_audio_buffer.clear
  */
 export interface InputAudioBufferClearedEvent {
   /** Optional event ID for tracking */
   event_id: EventId;
   type: ServerEventType.INPUT_AUDIO_BUFFER_CLEARED;
+}
+
+/**
+ * Event indicating speech has been detected in the audio buffer
+ * This event is sent in server_vad mode when speech is detected.
+ * The client may want to use this to interrupt audio playback or provide visual feedback.
+ * A input_audio_buffer.speech_stopped event will follow when speech stops.
+ */
+export interface InputAudioBufferSpeechStartedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED;
+  /** ID of the user message item that will be created when speech stops */
+  item_id: string;
+  /** Milliseconds from the start of all audio when speech was first detected */
+  audio_start_ms: number;
+}
+
+/**
+ * Event indicating speech has stopped in the audio buffer
+ * This event is sent in server_vad mode when speech ends.
+ * A conversation.item.created event will follow with the user message item.
+ */
+export interface InputAudioBufferSpeechStoppedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED;
+  /** ID of the user message item that will be created */
+  item_id: string;
+  /** Milliseconds since the session started when speech stopped */
+  audio_end_ms: number;
 }
 
 /**
@@ -290,6 +332,8 @@ export type ServerEvent =
   | TranscriptionSessionUpdatedEvent
   | InputAudioBufferCommittedEvent
   | InputAudioBufferClearedEvent
+  | InputAudioBufferSpeechStartedEvent
+  | InputAudioBufferSpeechStoppedEvent
   | ConversationItemCreatedEvent
   | ConversationItemRetrievedEvent
   | ConversationItemTruncatedEvent
