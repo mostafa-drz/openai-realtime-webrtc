@@ -146,15 +146,20 @@ export interface TracingConfig {
   metadata?: Record<string, string | number | boolean | null>;
 }
 
-// Session Configuration Types
-export interface SessionConfig {
+// Base Session Configuration
+export interface BaseSessionConfig {
   client_secret?: ClientSecretConfig;
   input_audio_format?: AudioFormat; // Default: 'pcm16'
   input_audio_noise_reduction?: NoiseReductionConfig | null;
   input_audio_transcription?: TranscriptionConfig | null;
+  modalities?: Modality[];
+  turn_detection?: TurnDetectionConfig;
+}
+
+// Session Configuration Types
+export interface SessionConfig extends BaseSessionConfig {
   instructions?: string;
   max_response_output_tokens?: MaxTokens;
-  modalities?: Modality[];
   model?: string;
   output_audio_format?: AudioFormat; // Default: 'pcm16'
   speed?: Speed;
@@ -162,7 +167,6 @@ export interface SessionConfig {
   tool_choice?: ToolChoice;
   tools?: Tool[];
   tracing?: 'auto' | TracingConfig | null;
-  turn_detection?: TurnDetectionConfig;
   voice?: Voice;
 }
 
@@ -252,4 +256,25 @@ export interface CreateTranscriptionSessionResponse {
   input_audio_format: AudioFormat;
   input_audio_transcription: TranscriptionConfig;
   client_secret: ClientSecret | null;
+}
+
+// Transcription Session Types
+export interface TranscriptionSessionConfig extends BaseSessionConfig {
+  include?: string[]; // Current available items are null
+  input_audio_transcription?: TranscriptionConfig; // Not nullable for transcription sessions
+}
+
+// Response Configuration Types
+export interface ResponseConfig {
+  conversation?: 'auto' | 'none'; // Default: 'auto'
+  input?: Item[]; // Creates new context instead of using default conversation
+  instructions?: string; // Override session instructions
+  max_response_output_tokens?: MaxTokens;
+  metadata?: Record<string, string>; // Max 16 key-value pairs, key max 64 chars, value max 512 chars
+  modalities?: Modality[];
+  output_audio_format?: AudioFormat;
+  temperature?: Temperature;
+  tool_choice?: ToolChoice | { type: 'function'; function: { name: string } };
+  tools?: Tool[];
+  voice?: Voice;
 }

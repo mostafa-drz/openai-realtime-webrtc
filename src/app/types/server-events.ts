@@ -3,7 +3,12 @@
  * @packageDocumentation
  */
 
-import { EventId, SessionConfig, Item } from './core';
+import {
+  EventId,
+  SessionConfig,
+  Item,
+  TranscriptionSessionConfig,
+} from './core';
 
 export enum ServerEventType {
   SESSION_UPDATED = 'session.updated',
@@ -16,12 +21,19 @@ export enum ServerEventType {
   RESPONSE_CREATED = 'response.created',
   RESPONSE_DONE = 'response.done',
   RESPONSE_CANCELLED = 'response.cancelled',
+  TRANSCRIPTION_SESSION_UPDATED = 'transcription_session.updated',
 }
 
 export interface SessionUpdatedEvent {
   event_id?: EventId;
   type: ServerEventType.SESSION_UPDATED;
   session: SessionConfig;
+}
+
+export interface TranscriptionSessionUpdatedEvent {
+  event_id?: EventId;
+  type: ServerEventType.TRANSCRIPTION_SESSION_UPDATED;
+  session: TranscriptionSessionConfig;
 }
 
 export interface InputAudioBufferCommittedEvent {
@@ -79,6 +91,7 @@ export interface ResponseCancelledEvent {
 // Union type for all server events
 export type ServerEvent =
   | SessionUpdatedEvent
+  | TranscriptionSessionUpdatedEvent
   | InputAudioBufferCommittedEvent
   | InputAudioBufferClearedEvent
   | ConversationItemCreatedEvent

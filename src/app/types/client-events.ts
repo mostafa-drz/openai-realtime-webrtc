@@ -7,13 +7,8 @@ import {
   EventId,
   SessionConfig,
   Item,
-  Tool,
-  ToolChoice,
-  Modality,
-  Voice,
-  AudioFormat,
-  Temperature,
-  MaxTokens,
+  ResponseConfig,
+  TranscriptionSessionConfig,
 } from './core';
 
 export enum ClientEventType {
@@ -27,6 +22,7 @@ export enum ClientEventType {
   CONVERSATION_ITEM_DELETE = 'conversation.item.delete',
   RESPONSE_CREATE = 'response.create',
   RESPONSE_CANCEL = 'response.cancel',
+  TRANSCRIPTION_SESSION_UPDATE = 'transcription_session.update',
 }
 
 // Event Interfaces
@@ -82,25 +78,19 @@ export interface ConversationItemDeleteEvent {
 export interface ResponseCreateEvent {
   event_id?: EventId;
   type: ClientEventType.RESPONSE_CREATE;
-  response: {
-    conversation?: 'auto' | 'none'; // Default: 'auto'
-    input?: Item[]; // Creates new context instead of using default conversation
-    instructions?: string; // Override session instructions
-    max_response_output_tokens?: MaxTokens;
-    metadata?: Record<string, string>; // Max 16 key-value pairs, key max 64 chars, value max 512 chars
-    modalities?: Modality[];
-    output_audio_format?: AudioFormat;
-    temperature?: Temperature;
-    tool_choice?: ToolChoice | { type: 'function'; function: { name: string } };
-    tools?: Tool[];
-    voice?: Voice;
-  };
+  response: ResponseConfig;
 }
 
 export interface ResponseCancelEvent {
   event_id?: EventId;
   type: ClientEventType.RESPONSE_CANCEL;
   response_id?: string; // Optional - if not provided, cancels in-progress response in default conversation
+}
+
+export interface TranscriptionSessionUpdateEvent {
+  event_id?: EventId;
+  type: ClientEventType.TRANSCRIPTION_SESSION_UPDATE;
+  session: TranscriptionSessionConfig;
 }
 
 // Union type for all client events
@@ -114,4 +104,5 @@ export type ClientEvent =
   | ConversationItemTruncateEvent
   | ConversationItemDeleteEvent
   | ResponseCreateEvent
-  | ResponseCancelEvent;
+  | ResponseCancelEvent
+  | TranscriptionSessionUpdateEvent;
