@@ -5,12 +5,13 @@
 
 import {
   EventId,
-  SessionConfig,
   Item,
   TranscriptionSessionConfig,
+  SessionResponse,
 } from './core';
 
 export enum ServerEventType {
+  SESSION_CREATED = 'session.created',
   SESSION_UPDATED = 'session.updated',
   INPUT_AUDIO_BUFFER_COMMITTED = 'input_audio_buffer.committed',
   INPUT_AUDIO_BUFFER_CLEARED = 'input_audio_buffer.cleared',
@@ -46,10 +47,16 @@ export interface ErrorEvent {
   error: ErrorDetails;
 }
 
+export interface SessionCreatedEvent {
+  event_id: EventId;
+  type: ServerEventType.SESSION_CREATED;
+  session: SessionResponse;
+}
+
 export interface SessionUpdatedEvent {
-  event_id?: EventId;
+  event_id: EventId;
   type: ServerEventType.SESSION_UPDATED;
-  session: SessionConfig;
+  session: SessionResponse;
 }
 
 export interface TranscriptionSessionUpdatedEvent {
@@ -117,6 +124,7 @@ export interface OutputAudioBufferClearedEvent {
 
 // Union type for all server events
 export type ServerEvent =
+  | SessionCreatedEvent
   | SessionUpdatedEvent
   | TranscriptionSessionUpdatedEvent
   | InputAudioBufferCommittedEvent

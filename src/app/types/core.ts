@@ -170,6 +170,12 @@ export interface SessionConfig extends BaseSessionConfig {
   voice?: Voice;
 }
 
+// Session Response Types
+export interface SessionResponse extends SessionConfig {
+  id: string; // Unique identifier for the session (e.g., sess_1234567890abcdef)
+  object: 'realtime.session';
+}
+
 // Content Interfaces
 export interface BaseContent {
   type: ContentType;
