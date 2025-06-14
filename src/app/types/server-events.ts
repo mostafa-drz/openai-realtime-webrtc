@@ -59,6 +59,10 @@ export enum ServerEventType {
   RESPONSE_CONTENT_PART_DONE = 'response.content_part.done',
   /** Transcription session configuration has been updated */
   TRANSCRIPTION_SESSION_UPDATED = 'transcription_session.updated',
+  /** Output audio buffer has started streaming */
+  OUTPUT_AUDIO_BUFFER_STARTED = 'output_audio_buffer.started',
+  /** Output audio buffer has stopped streaming */
+  OUTPUT_AUDIO_BUFFER_STOPPED = 'output_audio_buffer.stopped',
   /** Output audio buffer has been cleared */
   OUTPUT_AUDIO_BUFFER_CLEARED = 'output_audio_buffer.cleared',
   /** An error has occurred */
@@ -453,6 +457,49 @@ export interface RateLimitsUpdatedEvent {
 }
 
 /**
+ * Event indicating output audio buffer has started streaming
+ * WebRTC Only: Emitted when the server begins streaming audio to the client.
+ * This event is emitted after an audio content part has been added
+ * (response.content_part.added) to the response.
+ */
+export interface OutputAudioBufferStartedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.OUTPUT_AUDIO_BUFFER_STARTED;
+  /** The unique ID of the response that produced the audio */
+  response_id: string;
+}
+
+/**
+ * Event indicating output audio buffer has stopped streaming
+ * WebRTC Only: Emitted when the output audio buffer has been completely drained
+ * on the server, and no more audio is forthcoming. This event is emitted after
+ * the full response data has been sent to the client (response.done).
+ */
+export interface OutputAudioBufferStoppedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.OUTPUT_AUDIO_BUFFER_STOPPED;
+  /** The unique ID of the response that produced the audio */
+  response_id: string;
+}
+
+/**
+ * Event indicating output audio buffer has been cleared
+ * WebRTC Only: Emitted when the output audio buffer is cleared. This happens
+ * either in VAD mode when the user has interrupted
+ * (input_audio_buffer.speech_started), or when the client has emitted the
+ * output_audio_buffer.clear event to manually cut off the current audio response.
+ */
+export interface OutputAudioBufferClearedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.OUTPUT_AUDIO_BUFFER_CLEARED;
+  /** The unique ID of the response that produced the audio */
+  response_id: string;
+}
+
+/**
  * Union type for all server events
  */
 export type ServerEvent =
@@ -482,6 +529,8 @@ export type ServerEvent =
   | ResponseAudioDoneEvent
   | ResponseFunctionCallArgumentsDeltaEvent
   | ResponseFunctionCallArgumentsDoneEvent
+  | OutputAudioBufferStartedEvent
+  | OutputAudioBufferStoppedEvent
   | OutputAudioBufferClearedEvent
   | ConversationCreatedEvent
   | ConversationItemInputAudioTranscriptionCompletedEvent
