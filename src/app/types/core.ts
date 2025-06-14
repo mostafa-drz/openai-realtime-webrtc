@@ -525,3 +525,41 @@ export interface ResponseContentPart {
   /** The transcript of the audio (if type is "audio") */
   transcript?: string;
 }
+
+/**
+ * Base interface for client events
+ */
+export interface BaseClientEvent {
+  /** Optional event ID for tracking */
+  event_id?: EventId;
+}
+
+/**
+ * Base interface for response-related events
+ */
+export interface BaseResponseEvent extends BaseClientEvent {
+  /** The ID of the Response */
+  response_id: string;
+  /** The ID of the item */
+  item_id: string;
+  /** The index of the output item in the response */
+  output_index: number;
+  /** The index of the content part in the item's content array */
+  content_index: number;
+}
+
+/**
+ * Base interface for delta events
+ */
+export interface BaseDeltaEvent extends BaseResponseEvent {
+  /** The delta content */
+  delta: string;
+}
+
+/**
+ * Base interface for done events
+ */
+export interface BaseDoneEvent extends BaseResponseEvent {
+  /** The final content */
+  content: string;
+}

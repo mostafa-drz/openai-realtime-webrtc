@@ -13,6 +13,8 @@ import {
   ErrorDetails,
   Response,
   ResponseContentPart,
+  BaseResponseEvent,
+  BaseDeltaEvent,
 } from './core';
 
 /**
@@ -67,6 +69,18 @@ export enum ServerEventType {
   CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_DELTA = 'conversation.item.input_audio_transcription.delta',
   /** Audio transcription failed */
   CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_FAILED = 'conversation.item.input_audio_transcription.failed',
+  /** Text content delta update */
+  RESPONSE_TEXT_DELTA = 'response.text.delta',
+  /** Text content streaming complete */
+  RESPONSE_TEXT_DONE = 'response.text.done',
+  /** Audio transcript delta update */
+  RESPONSE_AUDIO_TRANSCRIPT_DELTA = 'response.audio_transcript.delta',
+  /** Audio transcript streaming complete */
+  RESPONSE_AUDIO_TRANSCRIPT_DONE = 'response.audio_transcript.done',
+  /** Audio content delta update */
+  RESPONSE_AUDIO_DELTA = 'response.audio.delta',
+  /** Audio content streaming complete */
+  RESPONSE_AUDIO_DONE = 'response.audio.done',
 }
 
 /**
@@ -283,16 +297,9 @@ export interface ConversationItemInputAudioTranscriptionCompletedEvent {
 /**
  * Event indicating a delta update to audio transcription
  */
-export interface ConversationItemInputAudioTranscriptionDeltaEvent {
-  /** Optional event ID for tracking */
-  event_id: EventId;
+export interface ConversationItemInputAudioTranscriptionDeltaEvent
+  extends BaseDeltaEvent {
   type: ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_DELTA;
-  /** ID of the item */
-  item_id: string;
-  /** Index of the content part in the item's content array */
-  content_index: number;
-  /** The text delta */
-  delta: string;
   /** The log probabilities of the transcription */
   logprobs: LogProbability[] | null;
 }
@@ -314,74 +321,84 @@ export interface ConversationItemInputAudioTranscriptionFailedEvent {
 
 /**
  * Event indicating a new output item has been added to the response
- * This event is sent when a new Item is created during Response generation
  */
-export interface ResponseOutputItemAddedEvent {
-  /** Optional event ID for tracking */
-  event_id: EventId;
+export interface ResponseOutputItemAddedEvent extends BaseResponseEvent {
   type: ServerEventType.RESPONSE_OUTPUT_ITEM_ADDED;
-  /** The ID of the Response to which the item belongs */
-  response_id: string;
-  /** The index of the output item in the Response */
-  output_index: number;
   /** The item to add to the conversation */
   item: Item;
 }
 
 /**
  * Event indicating an output item has completed streaming
- * This event is also emitted when a Response is interrupted, incomplete, or cancelled
  */
-export interface ResponseOutputItemDoneEvent {
-  /** Optional event ID for tracking */
-  event_id: EventId;
+export interface ResponseOutputItemDoneEvent extends BaseResponseEvent {
   type: ServerEventType.RESPONSE_OUTPUT_ITEM_DONE;
-  /** The ID of the Response to which the item belongs */
-  response_id: string;
-  /** The index of the output item in the Response */
-  output_index: number;
   /** The item to add to the conversation */
   item: Item;
 }
 
 /**
  * Event indicating a new content part has been added to an assistant message
- * This event is sent when a new content part is added during response generation
  */
-export interface ResponseContentPartAddedEvent {
-  /** Optional event ID for tracking */
-  event_id: EventId;
+export interface ResponseContentPartAddedEvent extends BaseResponseEvent {
   type: ServerEventType.RESPONSE_CONTENT_PART_ADDED;
-  /** The ID of the Response */
-  response_id: string;
-  /** The ID of the item to which the content part was added */
-  item_id: string;
-  /** The index of the output item in the response */
-  output_index: number;
-  /** The index of the content part in the item's content array */
-  content_index: number;
   /** The content part that was added */
   part: ResponseContentPart;
 }
 
 /**
  * Event indicating a content part has completed streaming
- * This event is also emitted when a Response is interrupted, incomplete, or cancelled
  */
-export interface ResponseContentPartDoneEvent {
-  /** Optional event ID for tracking */
-  event_id: EventId;
+export interface ResponseContentPartDoneEvent extends BaseResponseEvent {
   type: ServerEventType.RESPONSE_CONTENT_PART_DONE;
-  /** The ID of the Response */
-  response_id: string;
-  /** The ID of the item */
-  item_id: string;
-  /** The index of the output item in the response */
-  output_index: number;
-  /** The index of the content part in the item's content array */
-  content_index: number;
   /** The content part that is done */
   part: ResponseContentPart;
+}
+
+/**
+ * Event indicating a text content delta update
+ */
+export interface ResponseTextDeltaEvent extends BaseDeltaEvent {
+  type: ServerEventType.RESPONSE_TEXT_DELTA;
+}
+
+/**
+ * Event indicating text content streaming is complete
+ */
+export interface ResponseTextDoneEvent extends BaseResponseEvent {
+  type: ServerEventType.RESPONSE_TEXT_DONE;
+  /** The final text content */
+  text: string;
+}
+
+/**
+ * Event indicating an audio transcript delta update
+ */
+export interface ResponseAudioTranscriptDeltaEvent extends BaseDeltaEvent {
+  type: ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA;
+}
+
+/**
+ * Event indicating audio transcript streaming is complete
+ */
+export interface ResponseAudioTranscriptDoneEvent extends BaseResponseEvent {
+  type: ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DONE;
+  /** The final transcript of the audio */
+  transcript: string;
+}
+
+/**
+ * Event indicating an audio content delta update
+ */
+export interface ResponseAudioDeltaEvent extends BaseDeltaEvent {
+  type: ServerEventType.RESPONSE_AUDIO_DELTA;
+}
+
+/**
+ * Event indicating audio content streaming is complete
+ */
+export interface ResponseAudioDoneEvent extends BaseResponseEvent {
+  type: ServerEventType.RESPONSE_AUDIO_DONE;
 }
 
 /**
@@ -406,6 +423,12 @@ export type ServerEvent =
   | ResponseOutputItemDoneEvent
   | ResponseContentPartAddedEvent
   | ResponseContentPartDoneEvent
+  | ResponseTextDeltaEvent
+  | ResponseTextDoneEvent
+  | ResponseAudioTranscriptDeltaEvent
+  | ResponseAudioTranscriptDoneEvent
+  | ResponseAudioDeltaEvent
+  | ResponseAudioDoneEvent
   | OutputAudioBufferClearedEvent
   | ConversationCreatedEvent
   | ConversationItemInputAudioTranscriptionCompletedEvent

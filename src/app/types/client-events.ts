@@ -4,11 +4,11 @@
  */
 
 import {
-  EventId,
   SessionConfig,
   Item,
   ResponseConfig,
   TranscriptionSessionConfig,
+  BaseClientEvent,
 } from './core';
 
 /**
@@ -44,9 +44,7 @@ export enum ClientEventType {
 /**
  * Event to update session configuration
  */
-export interface SessionUpdateEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface SessionUpdateEvent extends BaseClientEvent {
   type: ClientEventType.SESSION_UPDATE;
   session: SessionConfig;
 }
@@ -54,9 +52,7 @@ export interface SessionUpdateEvent {
 /**
  * Event to append audio data to input buffer
  */
-export interface InputAudioBufferAppendEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface InputAudioBufferAppendEvent extends BaseClientEvent {
   type: ClientEventType.INPUT_AUDIO_BUFFER_APPEND;
   /** Base64-encoded audio bytes in the format specified by input_audio_format */
   audio: string;
@@ -65,27 +61,21 @@ export interface InputAudioBufferAppendEvent {
 /**
  * Event to commit input audio buffer for processing
  */
-export interface InputAudioBufferCommitEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface InputAudioBufferCommitEvent extends BaseClientEvent {
   type: ClientEventType.INPUT_AUDIO_BUFFER_COMMIT;
 }
 
 /**
  * Event to clear input audio buffer
  */
-export interface InputAudioBufferClearEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface InputAudioBufferClearEvent extends BaseClientEvent {
   type: ClientEventType.INPUT_AUDIO_BUFFER_CLEAR;
 }
 
 /**
  * Event to create a new conversation item
  */
-export interface ConversationItemCreateEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface ConversationItemCreateEvent extends BaseClientEvent {
   type: ClientEventType.CONVERSATION_ITEM_CREATE;
   /** ID of the previous item in the conversation. If undefined, appends to the end */
   previous_item_id?: string;
@@ -95,9 +85,7 @@ export interface ConversationItemCreateEvent {
 /**
  * Event to retrieve a conversation item
  */
-export interface ConversationItemRetrieveEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface ConversationItemRetrieveEvent extends BaseClientEvent {
   type: ClientEventType.CONVERSATION_ITEM_RETRIEVE;
   item_id: string;
 }
@@ -105,13 +93,8 @@ export interface ConversationItemRetrieveEvent {
 /**
  * Event to truncate a conversation item
  */
-export interface ConversationItemTruncateEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface ConversationItemTruncateEvent extends BaseClientEvent {
   type: ClientEventType.CONVERSATION_ITEM_TRUNCATE;
-  item_id: string;
-  /** Index of the content to truncate, must be 0 */
-  content_index: number;
   /** Inclusive duration in milliseconds */
   audio_end_ms: number;
 }
@@ -119,19 +102,14 @@ export interface ConversationItemTruncateEvent {
 /**
  * Event to delete a conversation item
  */
-export interface ConversationItemDeleteEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface ConversationItemDeleteEvent extends BaseClientEvent {
   type: ClientEventType.CONVERSATION_ITEM_DELETE;
-  item_id: string;
 }
 
 /**
  * Event to create a new response
  */
-export interface ResponseCreateEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface ResponseCreateEvent extends BaseClientEvent {
   type: ClientEventType.RESPONSE_CREATE;
   response: ResponseConfig;
 }
@@ -141,9 +119,7 @@ export interface ResponseCreateEvent {
  * This event can be used to stop the current response generation
  * and clear any pending output.
  */
-export interface ResponseCancelEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface ResponseCancelEvent extends BaseClientEvent {
   type: ClientEventType.RESPONSE_CANCEL;
   /** Optional response ID. If not provided, cancels in-progress response in default conversation */
   response_id?: string;
@@ -156,9 +132,7 @@ export interface ResponseCancelEvent {
 /**
  * Event to update transcription session configuration
  */
-export interface TranscriptionSessionUpdateEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface TranscriptionSessionUpdateEvent extends BaseClientEvent {
   type: ClientEventType.TRANSCRIPTION_SESSION_UPDATE;
   session: TranscriptionSessionConfig;
 }
@@ -166,9 +140,7 @@ export interface TranscriptionSessionUpdateEvent {
 /**
  * Event to clear output audio buffer
  */
-export interface OutputAudioBufferClearEvent {
-  /** Optional event ID for tracking */
-  event_id?: EventId;
+export interface OutputAudioBufferClearEvent extends BaseClientEvent {
   type: ClientEventType.OUTPUT_AUDIO_BUFFER_CLEAR;
 }
 
