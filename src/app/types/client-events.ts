@@ -23,6 +23,7 @@ export enum ClientEventType {
   RESPONSE_CREATE = 'response.create',
   RESPONSE_CANCEL = 'response.cancel',
   TRANSCRIPTION_SESSION_UPDATE = 'transcription_session.update',
+  OUTPUT_AUDIO_BUFFER_CLEAR = 'output_audio_buffer.clear',
 }
 
 // Event Interfaces
@@ -93,6 +94,11 @@ export interface TranscriptionSessionUpdateEvent {
   session: TranscriptionSessionConfig;
 }
 
+export interface OutputAudioBufferClearEvent {
+  event_id?: EventId;
+  type: ClientEventType.OUTPUT_AUDIO_BUFFER_CLEAR;
+}
+
 // Union type for all client events
 export type ClientEvent =
   | SessionUpdateEvent
@@ -105,4 +111,5 @@ export type ClientEvent =
   | ConversationItemDeleteEvent
   | ResponseCreateEvent
   | ResponseCancelEvent
-  | TranscriptionSessionUpdateEvent;
+  | TranscriptionSessionUpdateEvent
+  | OutputAudioBufferClearEvent;

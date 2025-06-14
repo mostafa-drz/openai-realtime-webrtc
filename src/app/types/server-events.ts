@@ -22,6 +22,7 @@ export enum ServerEventType {
   RESPONSE_DONE = 'response.done',
   RESPONSE_CANCELLED = 'response.cancelled',
   TRANSCRIPTION_SESSION_UPDATED = 'transcription_session.updated',
+  OUTPUT_AUDIO_BUFFER_CLEARED = 'output_audio_buffer.cleared',
 }
 
 export interface SessionUpdatedEvent {
@@ -88,6 +89,11 @@ export interface ResponseCancelledEvent {
   response_id: string;
 }
 
+export interface OutputAudioBufferClearedEvent {
+  event_id?: EventId;
+  type: ServerEventType.OUTPUT_AUDIO_BUFFER_CLEARED;
+}
+
 // Union type for all server events
 export type ServerEvent =
   | SessionUpdatedEvent
@@ -100,4 +106,5 @@ export type ServerEvent =
   | ConversationItemDeletedEvent
   | ResponseCreatedEvent
   | ResponseDoneEvent
-  | ResponseCancelledEvent;
+  | ResponseCancelledEvent
+  | OutputAudioBufferClearedEvent;
