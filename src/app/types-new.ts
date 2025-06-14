@@ -67,6 +67,7 @@ export type Temperature = number; // Range: 0.6-1.2, Default: 0.8
 export type Speed = number; // Range: 0.25-1.5, Default: 1.0
 export type Threshold = number; // Range: 0.0-1.0, Default: 0.5
 export type MaxTokens = number | 'inf'; // Range: 1-4096 or 'inf', Default: 'inf'
+export type EventId = string;
 
 // Complex Types
 export interface ExpirationConfig {
@@ -128,8 +129,8 @@ export interface TracingConfig {
   metadata?: Record<string, string | number | boolean | null>;
 }
 
-// Main Types
-export interface CreateSessionRequest {
+// Session Configuration Types
+export interface SessionConfig {
   client_secret?: ClientSecretConfig;
   input_audio_format?: AudioFormat; // Default: 'pcm16'
   input_audio_noise_reduction?: NoiseReductionConfig | null;
@@ -147,6 +148,9 @@ export interface CreateSessionRequest {
   turn_detection?: TurnDetectionConfig;
   voice?: Voice;
 }
+
+// Main Types
+export interface CreateSessionRequest extends SessionConfig {}
 
 export interface ClientSecret {
   value: string;
