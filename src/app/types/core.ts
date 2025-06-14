@@ -146,34 +146,122 @@ export interface TracingConfig {
   metadata?: Record<string, string | number | boolean | null>;
 }
 
-// Base Session Configuration
+/**
+ * Base configuration shared between regular and transcription sessions
+ */
 export interface BaseSessionConfig {
+  /** Configuration for client secret expiration */
   client_secret?: ClientSecretConfig;
-  input_audio_format?: AudioFormat; // Default: 'pcm16'
+  /** Audio format for input, defaults to PCM16 */
+  input_audio_format?: AudioFormat;
+  /** Configuration for noise reduction, can be disabled with null */
   input_audio_noise_reduction?: NoiseReductionConfig | null;
+  /** Configuration for audio transcription, can be disabled with null */
   input_audio_transcription?: TranscriptionConfig | null;
+  /** Supported modalities for the session */
   modalities?: Modality[];
+  /** Configuration for turn detection */
   turn_detection?: TurnDetectionConfig;
 }
 
-// Session Configuration Types
+/**
+ * Configuration for a regular session
+ */
 export interface SessionConfig extends BaseSessionConfig {
+  /** System instructions for the model */
   instructions?: string;
+  /** Maximum number of tokens in the response */
   max_response_output_tokens?: MaxTokens;
+  /** Model to use for the session */
   model?: string;
-  output_audio_format?: AudioFormat; // Default: 'pcm16'
+  /** Audio format for output, defaults to PCM16 */
+  output_audio_format?: AudioFormat;
+  /** Speech speed for audio output */
   speed?: Speed;
+  /** Temperature for response generation */
   temperature?: Temperature;
+  /** Tool choice configuration */
   tool_choice?: ToolChoice;
+  /** Available tools for the session */
   tools?: Tool[];
-  tracing?: 'auto' | TracingConfig | null;
+  /** Tracing configuration */
+  tracing?: TracingType | TracingConfig | null;
+  /** Voice to use for audio output */
   voice?: Voice;
+}
+
+/**
+ * Configuration for a transcription session
+ * Extends base session config with transcription-specific settings
+ */
+export interface TranscriptionSessionConfig extends BaseSessionConfig {
+  /** Currently not used, will be null */
+  include?: null;
+  /** Required configuration for audio transcription */
+  input_audio_transcription: TranscriptionConfig;
+}
+
+/**
+ * Response from creating a regular session
+ */
+export interface CreateSessionResponse {
+  id: string;
+  object: ObjectType.SESSION;
+  model: string;
+  modalities: Modality[];
+  instructions?: string;
+  voice: Voice;
+  input_audio_format: AudioFormat;
+  output_audio_format: AudioFormat;
+  input_audio_transcription?: TranscriptionConfig;
+  turn_detection: TurnDetectionConfig;
+  tools: Tool[];
+  tool_choice: ToolChoice;
+  temperature: Temperature;
+  max_response_output_tokens: MaxTokens;
+  speed: Speed;
+  tracing: TracingType | TracingConfig | null;
+  client_secret: ClientSecret;
+}
+
+/**
+ * Response from creating a transcription session
+ */
+export interface CreateTranscriptionSessionResponse {
+  id: string;
+  object: ObjectType.TRANSCRIPTION_SESSION;
+  modalities: Modality[];
+  turn_detection: TurnDetectionConfig;
+  input_audio_format: AudioFormat;
+  input_audio_transcription: TranscriptionConfig;
+  client_secret: ClientSecret;
+}
+
+// Object Types
+export enum ObjectType {
+  SESSION = 'realtime.session',
+  TRANSCRIPTION_SESSION = 'realtime.transcription_session',
+  CONVERSATION = 'realtime.conversation',
+  ITEM = 'realtime.item',
+}
+
+export enum ToolType {
+  FUNCTION = 'function',
+}
+
+export enum NoiseReductionType {
+  NEAR_FIELD = 'near_field',
+  FAR_FIELD = 'far_field',
+}
+
+export enum TracingType {
+  AUTO = 'auto',
 }
 
 // Session Response Types
 export interface SessionResponse extends SessionConfig {
-  id: string; // Unique identifier for the session (e.g., sess_1234567890abcdef)
-  object: 'realtime.session';
+  id: string;
+  object: ObjectType.SESSION;
 }
 
 // Content Interfaces
@@ -204,7 +292,7 @@ export interface BaseItem {
   id?: string;
   type: ItemType;
   status?: ItemStatus;
-  object: 'realtime.item';
+  object: ObjectType.ITEM;
 }
 
 export interface MessageItem extends BaseItem {
@@ -234,42 +322,6 @@ export interface ClientSecret {
   expires_at: number;
 }
 
-export interface CreateSessionResponse {
-  id: string;
-  object: 'realtime.session';
-  model: string;
-  modalities: Modality[];
-  instructions?: string;
-  voice: Voice;
-  input_audio_format: AudioFormat;
-  output_audio_format: AudioFormat;
-  input_audio_transcription?: TranscriptionConfig;
-  turn_detection: TurnDetectionConfig;
-  tools: Tool[];
-  tool_choice: ToolChoice;
-  temperature: Temperature;
-  max_response_output_tokens: MaxTokens;
-  speed: Speed;
-  tracing: 'auto' | TracingConfig | null;
-  client_secret: ClientSecret;
-}
-
-export interface CreateTranscriptionSessionResponse {
-  id: string;
-  object: 'realtime.transcription_session';
-  modalities: Modality[];
-  turn_detection: TurnDetectionConfig;
-  input_audio_format: AudioFormat;
-  input_audio_transcription: TranscriptionConfig;
-  client_secret: ClientSecret | null;
-}
-
-// Transcription Session Types
-export interface TranscriptionSessionConfig extends BaseSessionConfig {
-  include?: string[]; // Current available items are null
-  input_audio_transcription?: TranscriptionConfig; // Not nullable for transcription sessions
-}
-
 // Response Configuration Types
 export interface ResponseConfig {
   conversation?: 'auto' | 'none'; // Default: 'auto'
@@ -283,4 +335,10 @@ export interface ResponseConfig {
   tool_choice?: ToolChoice | { type: 'function'; function: { name: string } };
   tools?: Tool[];
   voice?: Voice;
+}
+
+// Conversation Types
+export interface Conversation {
+  id: string;
+  object: ObjectType.CONVERSATION;
 }
