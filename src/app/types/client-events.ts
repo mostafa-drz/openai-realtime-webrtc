@@ -138,6 +138,8 @@ export interface ResponseCreateEvent {
 
 /**
  * Event to cancel an in-progress response
+ * This event can be used to stop the current response generation
+ * and clear any pending output.
  */
 export interface ResponseCancelEvent {
   /** Optional event ID for tracking */
@@ -145,6 +147,10 @@ export interface ResponseCancelEvent {
   type: ClientEventType.RESPONSE_CANCEL;
   /** Optional response ID. If not provided, cancels in-progress response in default conversation */
   response_id?: string;
+  /** Optional reason for cancellation */
+  reason?: string;
+  /** Optional metadata about the cancellation */
+  metadata?: Record<string, string>;
 }
 
 /**

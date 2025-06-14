@@ -243,6 +243,7 @@ export enum ObjectType {
   TRANSCRIPTION_SESSION = 'realtime.transcription_session',
   CONVERSATION = 'realtime.conversation',
   ITEM = 'realtime.item',
+  RESPONSE = 'realtime.response',
 }
 
 export enum ToolType {
@@ -344,6 +345,16 @@ export interface Conversation {
 }
 
 /**
+ * Types of errors that can occur
+ */
+export enum ErrorType {
+  /** Invalid request error */
+  INVALID_REQUEST_ERROR = 'invalid_request_error',
+  /** Server error */
+  SERVER_ERROR = 'server_error',
+}
+
+/**
  * Log probability for a token in transcription
  */
 export interface LogProbability {
@@ -356,15 +367,172 @@ export interface LogProbability {
 }
 
 /**
+ * Base error details interface
+ * Used for both API errors and transcription errors
+ */
+export interface ErrorDetails {
+  /** Type of error */
+  type: ErrorType;
+  /** Error code if applicable */
+  code?: string | null;
+  /** Error message */
+  message: string;
+  /** Parameter that caused the error if applicable */
+  param?: string | null;
+  /** ID of the client event that caused the error if applicable */
+  event_id?: string | null;
+}
+
+/**
+ * Response error details
+ * @deprecated Use ErrorDetails instead
+ */
+export interface ResponseError {
+  /** Type of error */
+  type: string;
+  /** Error code if applicable */
+  code?: string;
+}
+
+/**
  * Transcription error details
+ * @deprecated Use ErrorDetails instead
  */
 export interface TranscriptionError {
   /** Type of transcription error */
-  type: 'transcription_error';
+  type: ErrorType;
   /** Error code */
   code: string;
   /** Error message */
   message: string;
   /** Parameter that caused the error if applicable */
   param: string | null;
+}
+
+/**
+ * Response status types
+ * These indicate the current state of a response in the system
+ */
+export enum ResponseStatus {
+  /** Response is currently being generated */
+  IN_PROGRESS = 'in_progress',
+  /** Response has completed successfully */
+  COMPLETED = 'completed',
+  /** Response was cancelled by the client */
+  CANCELLED = 'cancelled',
+  /** Response failed due to an error */
+  FAILED = 'failed',
+  /** Response was incomplete due to token limits or other constraints */
+  INCOMPLETE = 'incomplete',
+}
+
+/**
+ * Response status reason types
+ * These provide additional context about why a response reached its current status
+ */
+export enum ResponseStatusReason {
+  /** Response was interrupted by user speech detection */
+  TURN_DETECTED = 'turn_detected',
+  /** Response was cancelled by client request */
+  CLIENT_CANCELLED = 'client_cancelled',
+  /** Response hit the maximum output token limit */
+  MAX_OUTPUT_TOKENS = 'max_output_tokens',
+  /** Response was filtered due to content policy */
+  CONTENT_FILTER = 'content_filter',
+}
+
+/**
+ * Response status details
+ */
+export interface ResponseStatusDetails {
+  /** Error details if status is failed */
+  error?: ResponseError;
+  /** Reason for the status */
+  reason?: ResponseStatusReason;
+  /** Type of status */
+  type: ResponseStatus;
+}
+
+/**
+ * Cached token details
+ */
+export interface CachedTokenDetails {
+  /** Number of text tokens cached */
+  text_tokens: number;
+  /** Number of audio tokens cached */
+  audio_tokens: number;
+}
+
+/**
+ * Input token details
+ */
+export interface InputTokenDetails {
+  /** Number of cached tokens */
+  cached_tokens: number;
+  /** Number of text tokens */
+  text_tokens: number;
+  /** Number of audio tokens */
+  audio_tokens: number;
+  /** Details about cached tokens */
+  cached_tokens_details: CachedTokenDetails;
+}
+
+/**
+ * Output token details
+ */
+export interface OutputTokenDetails {
+  /** Number of text tokens */
+  text_tokens: number;
+  /** Number of audio tokens */
+  audio_tokens: number;
+  /** Total number of output tokens */
+  output_tokens: number;
+}
+
+/**
+ * Response usage statistics
+ */
+export interface ResponseUsage {
+  /** Total tokens used */
+  total_tokens: number;
+  /** Number of input tokens */
+  input_tokens: number;
+  /** Number of output tokens */
+  output_tokens: number;
+  /** Input token details */
+  input_token_details: InputTokenDetails;
+  /** Output token details */
+  output_token_details: OutputTokenDetails;
+}
+
+/**
+ * Response resource
+ */
+export interface Response {
+  /** Unique ID of the response */
+  id: string;
+  /** Object type */
+  object: 'realtime.response';
+  /** Which conversation the response is added to */
+  conversation_id: string | null;
+  /** Maximum number of output tokens */
+  max_output_tokens: MaxTokens;
+  /** Additional metadata */
+  metadata?: Record<string, string>;
+  /** Set of modalities the model used to respond */
+  modalities: Modality[];
+  /** List of output items */
+  output: Item[];
+  /** Format of output audio */
+  output_audio_format: AudioFormat;
+  /** Current status of the response */
+  status: ResponseStatus;
+  /** Additional status details */
+  status_details: ResponseStatusDetails | null;
+  /** Sampling temperature used */
+  temperature: Temperature;
+  /** Usage statistics */
+  usage: ResponseUsage | null;
+  /** Voice used for audio output */
+  voice: Voice;
 }

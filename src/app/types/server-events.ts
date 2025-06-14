@@ -11,6 +11,8 @@ import {
   Conversation,
   LogProbability,
   TranscriptionError,
+  Response,
+  ErrorDetails,
 } from './core';
 
 /**
@@ -57,32 +59,6 @@ export enum ServerEventType {
   CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_DELTA = 'conversation.item.input_audio_transcription.delta',
   /** Audio transcription failed */
   CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_FAILED = 'conversation.item.input_audio_transcription.failed',
-}
-
-/**
- * Types of errors that can occur
- */
-export enum ErrorType {
-  /** Invalid request error */
-  INVALID_REQUEST_ERROR = 'invalid_request_error',
-  /** Server error */
-  SERVER_ERROR = 'server_error',
-}
-
-/**
- * Details about an error that occurred
- */
-export interface ErrorDetails {
-  /** Type of error */
-  type: ErrorType;
-  /** Error code if applicable */
-  code?: string | null;
-  /** Error message */
-  message: string;
-  /** Parameter that caused the error if applicable */
-  param?: string | null;
-  /** ID of the client event that caused the error if applicable */
-  event_id?: string | null;
 }
 
 /**
@@ -227,22 +203,27 @@ export interface ConversationItemDeletedEvent {
 
 /**
  * Event indicating a new response has been created
+ * This is the first event of response creation, where the response is in an initial state of in_progress
  */
 export interface ResponseCreatedEvent {
   /** Optional event ID for tracking */
   event_id: EventId;
   type: ServerEventType.RESPONSE_CREATED;
-  response_id: string;
+  /** The response resource */
+  response: Response;
 }
 
 /**
- * Event indicating a response has completed
+ * Event indicating a response has completed streaming
+ * This event is always emitted, regardless of the final state.
+ * The response object includes all output items but omits raw audio data.
  */
 export interface ResponseDoneEvent {
   /** Optional event ID for tracking */
   event_id: EventId;
   type: ServerEventType.RESPONSE_DONE;
-  response_id: string;
+  /** The response resource with complete output items but no raw audio data */
+  response: Response;
 }
 
 /**
