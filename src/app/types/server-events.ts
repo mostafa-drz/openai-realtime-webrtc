@@ -45,6 +45,10 @@ export enum ServerEventType {
   RESPONSE_DONE = 'response.done',
   /** A response has been cancelled */
   RESPONSE_CANCELLED = 'response.cancelled',
+  /** A new output item has been added to the response */
+  RESPONSE_OUTPUT_ITEM_ADDED = 'response.output_item.added',
+  /** An output item has completed streaming */
+  RESPONSE_OUTPUT_ITEM_DONE = 'response.output_item.done',
   /** Transcription session configuration has been updated */
   TRANSCRIPTION_SESSION_UPDATED = 'transcription_session.updated',
   /** Output audio buffer has been cleared */
@@ -305,6 +309,38 @@ export interface ConversationItemInputAudioTranscriptionFailedEvent {
 }
 
 /**
+ * Event indicating a new output item has been added to the response
+ * This event is sent when a new Item is created during Response generation
+ */
+export interface ResponseOutputItemAddedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.RESPONSE_OUTPUT_ITEM_ADDED;
+  /** The ID of the Response to which the item belongs */
+  response_id: string;
+  /** The index of the output item in the Response */
+  output_index: number;
+  /** The item to add to the conversation */
+  item: Item;
+}
+
+/**
+ * Event indicating an output item has completed streaming
+ * This event is also emitted when a Response is interrupted, incomplete, or cancelled
+ */
+export interface ResponseOutputItemDoneEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.RESPONSE_OUTPUT_ITEM_DONE;
+  /** The ID of the Response to which the item belongs */
+  response_id: string;
+  /** The index of the output item in the Response */
+  output_index: number;
+  /** The item to add to the conversation */
+  item: Item;
+}
+
+/**
  * Union type for all server events
  */
 export type ServerEvent =
@@ -322,6 +358,8 @@ export type ServerEvent =
   | ResponseCreatedEvent
   | ResponseDoneEvent
   | ResponseCancelledEvent
+  | ResponseOutputItemAddedEvent
+  | ResponseOutputItemDoneEvent
   | OutputAudioBufferClearedEvent
   | ConversationCreatedEvent
   | ConversationItemInputAudioTranscriptionCompletedEvent
