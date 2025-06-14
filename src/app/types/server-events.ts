@@ -16,6 +16,7 @@ import {
   BaseDeltaEvent,
   TranscriptionSessionConfig,
   ObjectType,
+  RateLimit,
 } from './core';
 
 /**
@@ -86,6 +87,8 @@ export enum ServerEventType {
   RESPONSE_FUNCTION_CALL_ARGUMENTS_DELTA = 'response.function_call_arguments.delta',
   /** Function call arguments streaming complete */
   RESPONSE_FUNCTION_CALL_ARGUMENTS_DONE = 'response.function_call_arguments.done',
+  /** Rate limits have been updated */
+  RATE_LIMITS_UPDATED = 'rate_limits.updated',
 }
 
 /**
@@ -435,6 +438,21 @@ export interface ResponseFunctionCallArgumentsDoneEvent
 }
 
 /**
+ * Event indicating rate limits have been updated
+ * Emitted at the beginning of a Response to indicate the updated rate limits.
+ * When a Response is created some tokens will be "reserved" for the output tokens,
+ * the rate limits shown here reflect that reservation, which is then adjusted
+ * accordingly once the Response is completed.
+ */
+export interface RateLimitsUpdatedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.RATE_LIMITS_UPDATED;
+  /** List of rate limit information */
+  rate_limits: RateLimit[];
+}
+
+/**
  * Union type for all server events
  */
 export type ServerEvent =
@@ -469,4 +487,5 @@ export type ServerEvent =
   | ConversationItemInputAudioTranscriptionCompletedEvent
   | ConversationItemInputAudioTranscriptionDeltaEvent
   | ConversationItemInputAudioTranscriptionFailedEvent
+  | RateLimitsUpdatedEvent
   | ErrorEvent;

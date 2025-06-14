@@ -563,3 +563,27 @@ export interface BaseDoneEvent extends BaseResponseEvent {
   /** The final content */
   content: string;
 }
+
+/**
+ * Rate limit types
+ */
+export enum RateLimitName {
+  /** Rate limit for number of requests */
+  REQUESTS = 'requests',
+  /** Rate limit for number of tokens */
+  TOKENS = 'tokens',
+}
+
+/**
+ * Rate limit information
+ */
+export interface RateLimit {
+  /** The name of the rate limit */
+  name: RateLimitName;
+  /** The maximum allowed value for the rate limit */
+  limit: number;
+  /** The remaining value before the limit is reached */
+  remaining: number;
+  /** Seconds until the rate limit resets */
+  reset_seconds: number;
+}
