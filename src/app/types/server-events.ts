@@ -10,9 +10,9 @@ import {
   SessionResponse,
   Conversation,
   LogProbability,
-  TranscriptionError,
-  Response,
   ErrorDetails,
+  Response,
+  ResponseContentPart,
 } from './core';
 
 /**
@@ -49,6 +49,10 @@ export enum ServerEventType {
   RESPONSE_OUTPUT_ITEM_ADDED = 'response.output_item.added',
   /** An output item has completed streaming */
   RESPONSE_OUTPUT_ITEM_DONE = 'response.output_item.done',
+  /** A new content part has been added to an assistant message */
+  RESPONSE_CONTENT_PART_ADDED = 'response.content_part.added',
+  /** A content part has completed streaming */
+  RESPONSE_CONTENT_PART_DONE = 'response.content_part.done',
   /** Transcription session configuration has been updated */
   TRANSCRIPTION_SESSION_UPDATED = 'transcription_session.updated',
   /** Output audio buffer has been cleared */
@@ -305,7 +309,7 @@ export interface ConversationItemInputAudioTranscriptionFailedEvent {
   /** Index of the content part containing the audio */
   content_index: number;
   /** Details of the transcription error */
-  error: TranscriptionError;
+  error: ErrorDetails;
 }
 
 /**
@@ -341,6 +345,46 @@ export interface ResponseOutputItemDoneEvent {
 }
 
 /**
+ * Event indicating a new content part has been added to an assistant message
+ * This event is sent when a new content part is added during response generation
+ */
+export interface ResponseContentPartAddedEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.RESPONSE_CONTENT_PART_ADDED;
+  /** The ID of the Response */
+  response_id: string;
+  /** The ID of the item to which the content part was added */
+  item_id: string;
+  /** The index of the output item in the response */
+  output_index: number;
+  /** The index of the content part in the item's content array */
+  content_index: number;
+  /** The content part that was added */
+  part: ResponseContentPart;
+}
+
+/**
+ * Event indicating a content part has completed streaming
+ * This event is also emitted when a Response is interrupted, incomplete, or cancelled
+ */
+export interface ResponseContentPartDoneEvent {
+  /** Optional event ID for tracking */
+  event_id: EventId;
+  type: ServerEventType.RESPONSE_CONTENT_PART_DONE;
+  /** The ID of the Response */
+  response_id: string;
+  /** The ID of the item */
+  item_id: string;
+  /** The index of the output item in the response */
+  output_index: number;
+  /** The index of the content part in the item's content array */
+  content_index: number;
+  /** The content part that is done */
+  part: ResponseContentPart;
+}
+
+/**
  * Union type for all server events
  */
 export type ServerEvent =
@@ -360,6 +404,8 @@ export type ServerEvent =
   | ResponseCancelledEvent
   | ResponseOutputItemAddedEvent
   | ResponseOutputItemDoneEvent
+  | ResponseContentPartAddedEvent
+  | ResponseContentPartDoneEvent
   | OutputAudioBufferClearedEvent
   | ConversationCreatedEvent
   | ConversationItemInputAudioTranscriptionCompletedEvent

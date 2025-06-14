@@ -384,32 +384,6 @@ export interface ErrorDetails {
 }
 
 /**
- * Response error details
- * @deprecated Use ErrorDetails instead
- */
-export interface ResponseError {
-  /** Type of error */
-  type: string;
-  /** Error code if applicable */
-  code?: string;
-}
-
-/**
- * Transcription error details
- * @deprecated Use ErrorDetails instead
- */
-export interface TranscriptionError {
-  /** Type of transcription error */
-  type: ErrorType;
-  /** Error code */
-  code: string;
-  /** Error message */
-  message: string;
-  /** Parameter that caused the error if applicable */
-  param: string | null;
-}
-
-/**
  * Response status types
  * These indicate the current state of a response in the system
  */
@@ -446,7 +420,7 @@ export enum ResponseStatusReason {
  */
 export interface ResponseStatusDetails {
   /** Error details if status is failed */
-  error?: ResponseError;
+  error?: ErrorDetails;
   /** Reason for the status */
   reason?: ResponseStatusReason;
   /** Type of status */
@@ -535,4 +509,19 @@ export interface Response {
   usage: ResponseUsage | null;
   /** Voice used for audio output */
   voice: Voice;
+}
+
+/**
+ * Content part for response streaming
+ * Used in response.content_part events
+ */
+export interface ResponseContentPart {
+  /** The content type */
+  type: 'text' | 'audio';
+  /** The text content (if type is "text") */
+  text?: string;
+  /** Base64-encoded audio data (if type is "audio") */
+  audio?: string;
+  /** The transcript of the audio (if type is "audio") */
+  transcript?: string;
 }
