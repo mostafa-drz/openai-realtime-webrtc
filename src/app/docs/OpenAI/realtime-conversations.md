@@ -1,28 +1,32 @@
-Realtime model capabilities
+Realtime conversations
 
 Beta
 
-===================================
+==============================
 
-Learn how to manage Realtime sessions, conversations, model responses, and function calls.
+Learn how to manage Realtime speech-to-speech conversations.
 
-Once you have connected to the Realtime API through either [WebRTC](/docs/guides/realtime-webrtc) or [WebSocket](/docs/guides/realtime-websocket), you can build applications with a Realtime AI model. Doing so will require you to **send client events** to initiate actions, and **listen for server events** to respond to actions taken by the Realtime API. This guide will walk through the event flows required to use model capabilities like audio and text generation, and how to think about the state of a Realtime session.
+Once you have connected to the Realtime API through either [WebRTC](/docs/guides/realtime-webrtc) or [WebSocket](/docs/guides/realtime-websocket), you can call a Realtime model (such as [gpt-4o-realtime-preview](/docs/models/gpt-4o-realtime-preview)) to have speech-to-speech conversations. Doing so will require you to **send client events** to initiate actions, and **listen for server events** to respond to actions taken by the Realtime API.
 
-## About Realtime sessions
+This guide will walk through the event flows required to use model capabilities like audio and text generation and function calling, and how to think about the state of a Realtime Session.
 
-A Realtime session is a stateful interaction between the model and a connected client. The key components of the session are:
+If you do not need to have a conversation with the model, meaning you don't expect any response, you can use the Realtime API in [transcription mode](/docs/guides/realtime-transcription).
 
-- The **session** object, which controls the parameters of the interaction, like the model being used, the voice used to generate output, and other configuration.
-- A **conversation**, which represents user inputs and model outputs generated during the current session.
-- **Responses**, which are model-generated audio or text outputs that are added to the conversation.
+## Realtime speech-to-speech sessions
+
+A Realtime Session is a stateful interaction between the model and a connected client. The key components of the session are:
+
+- The **Session** object, which controls the parameters of the interaction, like the model being used, the voice used to generate output, and other configuration.
+- A **Conversation**, which represents user input Items and model output Items generated during the current session.
+- **Responses**, which are model-generated audio or text Items that are added to the Conversation.
 
 **Input audio buffer and WebSockets**
 
-If you are using WebRTC, much of the media handling required to send and receive audio from the model is assisted by WebRTC browser APIs.
+If you are using WebRTC, much of the media handling required to send and receive audio from the model is assisted by WebRTC APIs.
 
-If you are using WebSockets for audio, you will need to manually interact with the **input audio buffer** as well as the objects listed above. You'll be responsible for sending and receiving Base64-encoded audio bytes, and handling those as appropriate in your integration code.
+If you are using WebSockets for audio, you will need to manually interact with the **input audio buffer** by sending audio to the server, sent with JSON events with base64-encoded audio.
 
-All these components together make up a Realtime session. You will use client-sent events to update the state of the session, and listen for server-sent events to react to state changes within the session.
+All these components together make up a Realtime Session. You will use client events to update the state of the session, and listen for server events to react to state changes within the session.
 
 ![diagram realtime state](https://openaidevs.retool.com/api/file/11fe71d2-611e-4a26-a587-881719a90e56)
 
@@ -65,7 +69,7 @@ When the session has been updated, the server will emit a [`session.updated`](/d
 
 To generate text with a Realtime model, you can add text inputs to the current conversation, ask the model to generate a response, and listen for server-sent events indicating the progress of the model's response. In order to generate text, the [session must be configured](/docs/api-reference/realtime-client-events/session/update) with the `text` modality (this is true by default).
 
-Create a new text conversation item using the [`conversation.item.create`](/docs/api-reference/realtime-client-events/conversation/item/create) client event. This is similar to sending a [user message (prompt) in chat completions](/docs/guides/text-generation) in the REST API.
+Create a new text conversation item using the [`conversation.item.create`](/docs/api-reference/realtime-client-events/conversation/item/create) client event. This is similar to sending a [user message (prompt) in Chat Completions](/docs/guides/text-generation) in the REST API.
 
 Create a conversation item with user input
 
@@ -166,11 +170,15 @@ While the model response is being generated, the server will emit a number of li
 
 One of the most powerful features of the Realtime API is voice-to-voice interaction with the model, without an intermediate text-to-speech or speech-to-text step. This enables lower latency for voice interfaces, and gives the model more data to work with around the tone and inflection of voice input.
 
+### Voice options
+
+Realtime sessions can be configured to use one of several built‑in voices when producing audio output. You can set the `voice` on session creation (or on a `response.create`) to control how the model sounds. Current voice options are `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, and `verse`. Once the model has emitted audio in a session, the `voice` cannot be modified for that session.
+
 ### Handling audio with WebRTC
 
 If you are connecting to the Realtime API using WebRTC, the Realtime API is acting as a [peer connection](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection) to your client. Audio output from the model is delivered to your client as a [remote media stream](hhttps://developer.mozilla.org/en-US/docs/Web/API/MediaStream). Audio input to the model is collected using audio devices ([`getUserMedia`](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia)), and media streams are added as tracks to to the peer connection.
 
-The example code from the [WebRTC connection guide](/docs/guides/realtime-webrtc) shows a basic example of configuring both local and remote audio:
+The example code from the [WebRTC connection guide](/docs/guides/realtime-webrtc) shows a basic example of configuring both local and remote audio using browser APIs:
 
 ```javascript
 // Create a peer connection
@@ -188,22 +196,22 @@ const ms = await navigator.mediaDevices.getUserMedia({
 pc.addTrack(ms.getTracks()[0]);
 ```
 
-The snippet above should suffice for simple integrations with the Realtime API, but there's much more that can be done with the WebRTC APIs. For more examples of different kinds of user interfaces, check out the [WebRTC samples](https://github.com/webrtc/samples) repository. Live demos of these samples can also be [found here](https://webrtc.github.io/samples/).
+The snippet above enables simple interaction with the Realtime API, but there's much more that can be done. For more examples of different kinds of user interfaces, check out the [WebRTC samples](https://github.com/webrtc/samples) repository. Live demos of these samples can also be [found here](https://webrtc.github.io/samples/).
 
 Using [media captures and streams](https://developer.mozilla.org/en-US/docs/Web/API/Media_Capture_and_Streams_API) in the browser enables you to do things like mute and unmute microphones, select which device to collect input from, and more.
 
 ### Client and server events for audio in WebRTC
 
-By default, WebRTC clients don't need to send any client events to the Realtime API to start sending audio inputs. Once a local audio track is added to the peer connection, your users can just start talking!
+By default, WebRTC clients don't need to send any client events to the Realtime API before sending audio inputs. Once a local audio track is added to the peer connection, your users can just start talking!
 
-However, WebRTC clients still receive a number of server-sent lifecycle events as audio is moving back and forth between client and server over the peer connection. An incomplete sample of server events that are sent during a WebRTC session:
+However, WebRTC clients still receive a number of server-sent lifecycle events as audio is moving back and forth between client and server over the peer connection. Examples include:
 
 - When input is sent over the local media track, you will receive [`input_audio_buffer.speech_started`](/docs/api-reference/realtime-server-events/input_audio_buffer/speech_started) events from the server.
 - When local audio input stops, you'll receive the [`input_audio_buffer.speech_stopped`](/docs/api-reference/realtime-server-events/input_audio_buffer/speech_started) event.
 - You'll receive [delta events for the in-progress audio transcript](/docs/api-reference/realtime-server-events/response/audio_transcript/delta).
 - You'll receive a [`response.done`](/docs/api-reference/realtime-server-events/response/done) event when the model has transcribed and completed sending a response.
 
-Manipulating WebRTC APIs for media streams may give you all the control you need in your application. However, it may occasionally be necessary to use lower-level interfaces for audio input and output. Refer to the WebSockets section below for more information and a listing of events required for granular audio input handling.
+Manipulating WebRTC APIs for media streams may give you all the control you need. However, it may occasionally be necessary to use lower-level interfaces for audio input and output. Refer to the WebSockets section below for more information and a listing of events required for granular audio input handling.
 
 ### Handling audio with WebSockets
 
@@ -400,9 +408,13 @@ def on_message(ws, message):
         # print(server_event.delta)
 ```
 
-## Voice activity detection (VAD)
+## Voice activity detection
 
-By default, Realtime sessions have **voice activity detection (VAD)** enabled, which means the API will determine when the user has started or stopped speaking, and automatically start to respond. The behavior and sensitivity of VAD can be configured through the `session.turn_detection` property of the [`session.update`](/docs/api-reference/realtime-client-events/session/update) client event.
+By default, Realtime sessions have **voice activity detection (VAD)** enabled, which means the API will determine when the user has started or stopped speaking and respond automatically.
+
+Read more about how to configure VAD in our [voice activity detection](/docs/guides/realtime-vad) guide.
+
+### Disable VAD
 
 VAD can be disabled by setting `turn_detection` to `null` with the [`session.update`](/docs/api-reference/realtime-client-events/session/update) client event. This can be useful for interfaces where you would like to take granular control over audio input, like [push to talk](https://en.wikipedia.org/wiki/Push-to-talk) interfaces.
 
@@ -414,9 +426,9 @@ When VAD is disabled, the client will have to manually emit some additional clie
 
 ### Keep VAD, but disable automatic responses
 
-If you would like to keep VAD mode enabled, but would just like to retain the ability to manually decide when a response is generated, you can set `turn_detection.create_response` to `false` with the [`session.update`](/docs/api-reference/realtime-client-events/session/update) client event. This will retain all the behavior of VAD, but still require you to manually send a [`response.create`](/docs/api-reference/realtime-client-events/response/create) event before a response is generated by the model.
+If you would like to keep VAD mode enabled, but would just like to retain the ability to manually decide when a response is generated, you can set `turn_detection.interrupt_response` and `turn_detection.create_response` to `false` with the [`session.update`](/docs/api-reference/realtime-client-events/session/update) client event. This will retain all the behavior of VAD but not automatically create new Responses. Clients can trigger these manually with a [`response.create`](/docs/api-reference/realtime-client-events/response/create) event.
 
-This can be useful for moderation or input validation, where you're comfortable trading a bit more latency in the interaction for control over inputs.
+This can be useful for moderation or input validation or RAG patterns, where you're comfortable trading a bit more latency in the interaction for control over inputs.
 
 ## Create responses outside the default conversation
 
@@ -848,21 +860,3 @@ This unsuccessful event sent from the client will emit an error event like the f
   "event_id": "my_awesome_event"
 }
 ```
-
-## Next steps
-
-Realtime models unlock new possibilities for AI interactions. We can't wait to hear about what you create with the Realtime API! As you continue to explore, here are a few other resources that may be useful.
-
-[
-
-Realtime Console
-
-The Realtime console sample app shows how to exercise function calling, client and server events, and much more.
-
-](https://github.com/openai/openai-realtime-console)[
-
-Event API reference
-
-A complete listing of client and server events in the Realtime API
-
-](/docs/api-reference/realtime-client-events)
