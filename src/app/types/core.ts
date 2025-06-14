@@ -202,39 +202,58 @@ export interface TranscriptionSessionConfig extends BaseSessionConfig {
 }
 
 /**
+ * Base response type for session creation
+ */
+export interface BaseSessionResponse {
+  /** Unique ID of the session */
+  id: string;
+  /** Object type */
+  object: ObjectType;
+  /** Supported modalities for the session */
+  modalities: Modality[];
+  /** Configuration for turn detection */
+  turn_detection: TurnDetectionConfig;
+  /** Audio format for input */
+  input_audio_format: AudioFormat;
+  /** Configuration for audio transcription */
+  input_audio_transcription: TranscriptionConfig;
+  /** Client secret for authentication */
+  client_secret: ClientSecret;
+}
+
+/**
  * Response from creating a regular session
  */
-export interface CreateSessionResponse {
-  id: string;
+export interface CreateSessionResponse extends BaseSessionResponse {
   object: ObjectType.SESSION;
+  /** Model to use for the session */
   model: string;
-  modalities: Modality[];
+  /** System instructions for the model */
   instructions?: string;
+  /** Voice to use for audio output */
   voice: Voice;
-  input_audio_format: AudioFormat;
+  /** Audio format for output */
   output_audio_format: AudioFormat;
-  input_audio_transcription?: TranscriptionConfig;
-  turn_detection: TurnDetectionConfig;
+  /** Available tools for the session */
   tools: Tool[];
+  /** Tool choice configuration */
   tool_choice: ToolChoice;
+  /** Temperature for response generation */
   temperature: Temperature;
+  /** Maximum number of tokens in the response */
   max_response_output_tokens: MaxTokens;
+  /** Speech speed for audio output */
   speed: Speed;
+  /** Tracing configuration */
   tracing: TracingType | TracingConfig | null;
-  client_secret: ClientSecret;
 }
 
 /**
  * Response from creating a transcription session
  */
-export interface CreateTranscriptionSessionResponse {
-  id: string;
+export interface CreateTranscriptionSessionResponse
+  extends BaseSessionResponse {
   object: ObjectType.TRANSCRIPTION_SESSION;
-  modalities: Modality[];
-  turn_detection: TurnDetectionConfig;
-  input_audio_format: AudioFormat;
-  input_audio_transcription: TranscriptionConfig;
-  client_secret: ClientSecret;
 }
 
 // Object Types
@@ -512,19 +531,34 @@ export interface Response {
 }
 
 /**
+ * Text content part for response streaming
+ */
+export interface TextResponseContentPart {
+  /** The content type */
+  type: 'text';
+  /** The text content */
+  text: string;
+}
+
+/**
+ * Audio content part for response streaming
+ */
+export interface AudioResponseContentPart {
+  /** The content type */
+  type: 'audio';
+  /** Base64-encoded audio data */
+  audio: string;
+  /** The transcript of the audio */
+  transcript?: string;
+}
+
+/**
  * Content part for response streaming
  * Used in response.content_part events
  */
-export interface ResponseContentPart {
-  /** The content type */
-  type: 'text' | 'audio';
-  /** The text content (if type is "text") */
-  text?: string;
-  /** Base64-encoded audio data (if type is "audio") */
-  audio?: string;
-  /** The transcript of the audio (if type is "audio") */
-  transcript?: string;
-}
+export type ResponseContentPart =
+  | TextResponseContentPart
+  | AudioResponseContentPart;
 
 /**
  * Base interface for client events
