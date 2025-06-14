@@ -81,6 +81,10 @@ export enum ServerEventType {
   RESPONSE_AUDIO_DELTA = 'response.audio.delta',
   /** Audio content streaming complete */
   RESPONSE_AUDIO_DONE = 'response.audio.done',
+  /** Function call arguments delta update */
+  RESPONSE_FUNCTION_CALL_ARGUMENTS_DELTA = 'response.function_call_arguments.delta',
+  /** Function call arguments streaming complete */
+  RESPONSE_FUNCTION_CALL_ARGUMENTS_DONE = 'response.function_call_arguments.done',
 }
 
 /**
@@ -402,6 +406,28 @@ export interface ResponseAudioDoneEvent extends BaseResponseEvent {
 }
 
 /**
+ * Event indicating function call arguments delta update
+ */
+export interface ResponseFunctionCallArgumentsDeltaEvent
+  extends BaseDeltaEvent {
+  type: ServerEventType.RESPONSE_FUNCTION_CALL_ARGUMENTS_DELTA;
+  /** The ID of the function call */
+  call_id: string;
+}
+
+/**
+ * Event indicating function call arguments streaming is complete
+ */
+export interface ResponseFunctionCallArgumentsDoneEvent
+  extends BaseResponseEvent {
+  type: ServerEventType.RESPONSE_FUNCTION_CALL_ARGUMENTS_DONE;
+  /** The ID of the function call */
+  call_id: string;
+  /** The final arguments as a JSON string */
+  arguments: string;
+}
+
+/**
  * Union type for all server events
  */
 export type ServerEvent =
@@ -429,6 +455,8 @@ export type ServerEvent =
   | ResponseAudioTranscriptDoneEvent
   | ResponseAudioDeltaEvent
   | ResponseAudioDoneEvent
+  | ResponseFunctionCallArgumentsDeltaEvent
+  | ResponseFunctionCallArgumentsDoneEvent
   | OutputAudioBufferClearedEvent
   | ConversationCreatedEvent
   | ConversationItemInputAudioTranscriptionCompletedEvent
