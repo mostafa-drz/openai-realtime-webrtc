@@ -6,7 +6,6 @@
 import {
   EventId,
   Item,
-  TranscriptionSessionConfig,
   SessionResponse,
   Conversation,
   LogProbability,
@@ -15,6 +14,8 @@ import {
   ResponseContentPart,
   BaseResponseEvent,
   BaseDeltaEvent,
+  TranscriptionSessionConfig,
+  ObjectType,
 } from './core';
 
 /**
@@ -124,7 +125,13 @@ export interface TranscriptionSessionUpdatedEvent {
   /** Optional event ID for tracking */
   event_id: EventId;
   type: ServerEventType.TRANSCRIPTION_SESSION_UPDATED;
-  session: TranscriptionSessionConfig;
+  /** A new Realtime transcription session configuration */
+  session: TranscriptionSessionConfig & {
+    /** Unique ID of the session */
+    id: string;
+    /** Object type */
+    object: ObjectType.TRANSCRIPTION_SESSION;
+  };
 }
 
 /**

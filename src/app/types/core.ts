@@ -195,8 +195,8 @@ export interface SessionConfig extends BaseSessionConfig {
  * Extends base session config with transcription-specific settings
  */
 export interface TranscriptionSessionConfig extends BaseSessionConfig {
-  /** Currently not used, will be null */
-  include?: null;
+  /** Additional fields to include in the response */
+  include?: string[];
   /** Required configuration for audio transcription */
   input_audio_transcription: TranscriptionConfig;
 }
