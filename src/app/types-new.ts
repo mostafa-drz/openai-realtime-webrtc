@@ -54,6 +54,12 @@ export enum Voice {
   VERSE = 'verse',
 }
 
+export enum TranscriptionModel {
+  GPT4O_TRANSCRIBE = 'gpt-4o-transcribe',
+  GPT4O_MINI_TRANSCRIBE = 'gpt-4o-mini-transcribe',
+  WHISPER_1 = 'whisper-1',
+}
+
 // Atomic Types with constraints
 export type Seconds = number; // Range: 10-7200, Default: 600
 export type Milliseconds = number;
@@ -77,8 +83,8 @@ export interface NoiseReductionConfig {
 }
 
 export interface TranscriptionConfig {
-  language?: string; // ISO-639-1 format (e.g., 'en')
-  model: 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe' | 'whisper-1'; // Required when config is present
+  language?: string | null; // ISO-639-1 format (e.g., 'en')
+  model: TranscriptionModel; // Required when config is present
   prompt?: string; // Keywords for whisper-1, free text for gpt-4o-transcribe models
 }
 
@@ -165,4 +171,25 @@ export interface CreateSessionResponse {
   speed: Speed;
   tracing: 'auto' | TracingConfig | null;
   client_secret: ClientSecret;
+}
+
+// Transcription Session Types
+export interface CreateTranscriptionSessionRequest {
+  client_secret?: ClientSecretConfig;
+  include?: null[]; // Current available items are null
+  input_audio_format?: AudioFormat; // Default: 'pcm16'
+  input_audio_noise_reduction?: NoiseReductionConfig | null;
+  input_audio_transcription?: TranscriptionConfig;
+  modalities?: Modality[];
+  turn_detection?: TurnDetectionConfig;
+}
+
+export interface CreateTranscriptionSessionResponse {
+  id: string;
+  object: 'realtime.transcription_session';
+  modalities: Modality[];
+  turn_detection: TurnDetectionConfig;
+  input_audio_format: AudioFormat;
+  input_audio_transcription: TranscriptionConfig;
+  client_secret: ClientSecret | null;
 }

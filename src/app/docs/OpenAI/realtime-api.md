@@ -203,3 +203,58 @@ A new Realtime session configuration, with an ephemeral key. Default TTL for key
   }
 }
 ```
+
+## Create Transcription Session
+
+**POST**
+`https://api.openai.com/v1/realtime/transcription_sessions`
+
+Create an ephemeral API token for use in client-side applications with the Realtime API specifically for realtime transcriptions. Can be configured with the same session parameters as the `transcription_session.update` client event.
+
+It responds with a session object, plus a `client_secret` key which contains a usable ephemeral API token that can be used to authenticate browser clients for the Realtime API.
+
+### Request Body
+
+- `client_secret` (object, Optional): Configuration options for the generated client secret.
+- `include` (array, Optional): The set of items to include in the transcription. Current available items are `null`.
+- `input_audio_format` (string, Optional, Defaults to `pcm16`): The format of input audio. Options are `pcm16`, `g711_ulaw`, or `g711_alaw`. For `pcm16`, input audio must be 16-bit PCM at a 24kHz sample rate, single channel (mono), and little-endian byte order.
+- `input_audio_noise_reduction` (object, Optional, Defaults to `null`): Configuration for input audio noise reduction.
+- `input_audio_transcription` (object, Optional): Configuration for input audio transcription. The client can optionally set the language and prompt for transcription.
+- `modalities` (Optional): The set of modalities the model can respond with.
+- `turn_detection` (object, Optional): Configuration for turn detection, either Server VAD or Semantic VAD.
+
+### Returns
+
+The created Realtime transcription session object, plus an ephemeral key.
+
+### Example Request
+
+```bash
+curl -X POST https://api.openai.com/v1/realtime/transcription_sessions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+### Example Response
+
+```json
+{
+  "id": "sess_BBwZc7cFV3XizEyKGDCGL",
+  "object": "realtime.transcription_session",
+  "modalities": ["audio", "text"],
+  "turn_detection": {
+    "type": "server_vad",
+    "threshold": 0.5,
+    "prefix_padding_ms": 300,
+    "silence_duration_ms": 200
+  },
+  "input_audio_format": "pcm16",
+  "input_audio_transcription": {
+    "model": "gpt-4o-transcribe",
+    "language": null,
+    "prompt": ""
+  },
+  "client_secret": null
+}
+```
