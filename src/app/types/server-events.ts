@@ -23,6 +23,27 @@ export enum ServerEventType {
   RESPONSE_CANCELLED = 'response.cancelled',
   TRANSCRIPTION_SESSION_UPDATED = 'transcription_session.updated',
   OUTPUT_AUDIO_BUFFER_CLEARED = 'output_audio_buffer.cleared',
+  ERROR = 'error',
+}
+
+// Error Types
+export enum ErrorType {
+  INVALID_REQUEST_ERROR = 'invalid_request_error',
+  SERVER_ERROR = 'server_error',
+}
+
+export interface ErrorDetails {
+  type: ErrorType;
+  code?: string | null;
+  message: string;
+  param?: string | null;
+  event_id?: string | null; // The event_id of the client event that caused the error
+}
+
+export interface ErrorEvent {
+  event_id: EventId;
+  type: ServerEventType.ERROR;
+  error: ErrorDetails;
 }
 
 export interface SessionUpdatedEvent {
@@ -107,4 +128,5 @@ export type ServerEvent =
   | ResponseCreatedEvent
   | ResponseDoneEvent
   | ResponseCancelledEvent
-  | OutputAudioBufferClearedEvent;
+  | OutputAudioBufferClearedEvent
+  | ErrorEvent;
