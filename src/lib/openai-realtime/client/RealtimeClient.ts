@@ -1,3 +1,4 @@
+import { ClientEventType } from '../types/client-events';
 import { SessionConfig, ConnectionState } from '../types/core';
 
 export interface RealtimeClientConfig {
@@ -130,7 +131,18 @@ export class RealtimeClient {
   }
 
   updateSession(config: Partial<SessionConfig>): void {
-    // TODO: Send session.update over WebSocket
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.SESSION_UPDATE,
+      session: {
+        ...this.config,
+        ...config,
+      },
+    };
+    this.dataChannel.send(JSON.stringify(event));
   }
 
   async disconnect(): Promise<void> {
