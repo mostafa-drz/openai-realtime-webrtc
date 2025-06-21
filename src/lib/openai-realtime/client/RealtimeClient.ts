@@ -1,5 +1,6 @@
 import { ClientEventType } from '../types/client-events';
 import { SessionConfig, ConnectionState } from '../types/core';
+import { ServerEventType } from '../types/server-events';
 
 export interface RealtimeClientConfig {
   clientSecret: string;
@@ -32,7 +33,26 @@ export class RealtimeClient {
   }
 
   private handleServerEvent(event: any) {
-    // Placeholder for handling server events received on data channel
+    switch (event.type) {
+      case ServerEventType.RESPONSE_TEXT_DELTA: {
+        const token = event.delta?.value || '';
+        this.config.onMessageToken?.(token);
+        break;
+      }
+      case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA: {
+        const transcript = event.delta?.value || '';
+        this.config.onTranscript?.(transcript);
+        break;
+      }
+      case ServerEventType.ERROR: {
+        const error = new Error(event.message || 'Unknown server error');
+        this.config.onError?.(error);
+        break;
+      }
+      default: {
+        console.debug('[RealtimeClient] Unhandled server event:', event);
+      }
+    }
   }
 
   private handleRemoteAudio(stream: MediaStream) {
