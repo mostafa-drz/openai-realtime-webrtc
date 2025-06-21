@@ -116,7 +116,17 @@ export class RealtimeClient {
   }
 
   async stopVoiceInput(): Promise<void> {
-    // TODO: Stop mic + audio stream
+    if (!this.pc) return;
+
+    // Stop and remove all audio tracks from the peer connection
+    this.pc.getSenders().forEach((sender) => {
+      if (sender.track?.kind === 'audio') {
+        sender.track.stop();
+        this.pc?.removeTrack(sender);
+      }
+    });
+
+    this.micActive = false;
   }
 
   updateSession(config: Partial<SessionConfig>): void {
