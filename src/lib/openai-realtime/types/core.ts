@@ -77,6 +77,13 @@ export enum ItemStatus {
   INCOMPLETE = 'incomplete',
 }
 
+export enum ConnectionState {
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
+  ERROR = 'error',
+}
+
 // Atomic Types with constraints
 export type Seconds = number; // Range: 10-7200, Default: 600
 export type Milliseconds = number;
