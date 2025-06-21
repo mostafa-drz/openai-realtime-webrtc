@@ -36,7 +36,10 @@ export class RealtimeClient {
   }
 
   private handleRemoteAudio(stream: MediaStream) {
-    // Placeholder for handling remote audio stream
+    const audio = document.createElement('audio');
+    audio.autoplay = true;
+    audio.srcObject = stream;
+    document.body.appendChild(audio); // optionally append to DOM
   }
 
   async connect(): Promise<void> {
