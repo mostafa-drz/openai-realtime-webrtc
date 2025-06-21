@@ -95,7 +95,24 @@ export class RealtimeClient {
   }
 
   async startVoiceInput(): Promise<void> {
-    // TODO: Start mic + audio stream
+    if (!this.pc || !this.dataChannel) {
+      throw new Error(
+        'PeerConnection is not initialized. Call connect() first.'
+      );
+    }
+
+    if (this.micActive) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioTrack = stream.getAudioTracks()[0];
+      this.pc.addTrack(audioTrack, stream);
+      this.micActive = true;
+    } catch (err) {
+      this.config.onError?.(
+        err instanceof Error ? err : new Error(String(err))
+      );
+    }
   }
 
   async stopVoiceInput(): Promise<void> {
