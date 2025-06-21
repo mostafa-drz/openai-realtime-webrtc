@@ -134,7 +134,28 @@ export class RealtimeClient {
   }
 
   async disconnect(): Promise<void> {
-    // TODO: Clean up connection and media
+    try {
+      this.pc?.getSenders().forEach((sender) => {
+        sender.track?.stop();
+        this.pc?.removeTrack(sender);
+      });
+
+      this.pc?.close();
+      this.pc = undefined;
+
+      this.dataChannel?.close();
+      this.dataChannel = undefined;
+
+      this.sessionId = undefined;
+      this.micActive = false;
+
+      this.updateState(ConnectionState.DISCONNECTED);
+    } catch (err) {
+      this.updateState(ConnectionState.ERROR);
+      this.config.onError?.(
+        err instanceof Error ? err : new Error(String(err))
+      );
+    }
   }
 
   isConnected(): boolean {
