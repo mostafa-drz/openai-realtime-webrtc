@@ -1,0 +1,149 @@
+'use client';
+
+import { useState } from 'react';
+
+interface EventLogItem {
+  id: string;
+  type: string;
+  data: Record<string, unknown>;
+  timestamp: Date;
+}
+
+interface EventLogProps {
+  events: EventLogItem[];
+}
+
+export function EventLog({ events }: EventLogProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const getEventColor = (type: string) => {
+    switch (type) {
+      case 'message_token':
+        return 'text-green-600 dark:text-green-400';
+      case 'transcript':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'connection_state':
+        return 'text-purple-600 dark:text-purple-400';
+      case 'error':
+      case 'session_error':
+      case 'voice_error':
+      case 'update_error':
+        return 'text-red-600 dark:text-red-400';
+      case 'session_created':
+      case 'session_updated':
+        return 'text-orange-600 dark:text-orange-400';
+      case 'voice_started':
+      case 'voice_stopped':
+        return 'text-indigo-600 dark:text-indigo-400';
+      default:
+        return 'text-slate-600 dark:text-slate-400';
+    }
+  };
+
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'message_token':
+        return '💬';
+      case 'transcript':
+        return '🎤';
+      case 'connection_state':
+        return '🔗';
+      case 'error':
+      case 'session_error':
+      case 'voice_error':
+      case 'update_error':
+        return '❌';
+      case 'session_created':
+      case 'session_updated':
+        return '⚙️';
+      case 'voice_started':
+        return '🎙️';
+      case 'voice_stopped':
+        return '🔇';
+      default:
+        return '📝';
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+      {/* Header */}
+      <div
+        className="p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Event Log
+            </h3>
+            <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs rounded-full">
+              {events.length} events
+            </span>
+          </div>
+          <svg
+            className={`w-5 h-5 text-slate-500 dark:text-slate-400 transition-transform ${
+              isExpanded ? 'rotate-180' : ''
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+      </div>
+
+      {/* Event List */}
+      {isExpanded && (
+        <div className="border-t border-slate-200 dark:border-slate-700 max-h-96 overflow-y-auto">
+          {events.length === 0 ? (
+            <div className="p-4 text-center text-slate-500 dark:text-slate-400">
+              No events logged yet
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
+              {events
+                .slice()
+                .reverse()
+                .map((event) => (
+                  <div
+                    key={event.id}
+                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">
+                        {getEventIcon(event.type)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className={`text-sm font-medium ${getEventColor(event.type)}`}
+                          >
+                            {event.type}
+                          </span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {event.timestamp.toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div className="text-sm text-slate-700 dark:text-slate-300">
+                          <pre className="whitespace-pre-wrap break-words">
+                            {JSON.stringify(event.data, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

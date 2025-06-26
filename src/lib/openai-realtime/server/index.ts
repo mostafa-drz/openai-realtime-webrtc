@@ -1,4 +1,4 @@
-import { SessionConfig } from '../types';
+import { SessionConfig, CreateSessionResponse } from '../types';
 
 export interface ServerRealtimeClientConfig {
   baseUrl: string;
@@ -11,7 +11,7 @@ export const defaultServerRealtimeClientConfig: ServerRealtimeClientConfig = {
 export async function createSession(
   config: SessionConfig,
   options: Partial<ServerRealtimeClientConfig> = {}
-) {
+): Promise<CreateSessionResponse> {
   const baseUrl = options.baseUrl || defaultServerRealtimeClientConfig.baseUrl;
 
   const response = await fetch(baseUrl, {
@@ -24,9 +24,9 @@ export async function createSession(
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI session creation failed: ${response.statusText}`);
+    throw new Error(`OpenAI session creation failed: ${await response.text()}`);
   }
 
-  const data = await response.json();
+  const data: CreateSessionResponse = await response.json();
   return data;
 }
