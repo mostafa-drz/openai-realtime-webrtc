@@ -8,7 +8,6 @@ import {
 
 export async function createRealtimeSession(config: SessionConfig) {
   try {
-    console.log('Creating session with config:', config);
     // Validate required fields
     if (!config.model) {
       throw new Error('Model is required');

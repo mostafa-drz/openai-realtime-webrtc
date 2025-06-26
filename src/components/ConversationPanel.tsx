@@ -20,6 +20,7 @@ interface ConversationPanelProps {
   events: EventLogItem[];
   conversationItems: Item[];
   isResponding: boolean;
+  modalities?: string[];
   onSendTextMessage: (text: string) => void;
 }
 
@@ -28,6 +29,7 @@ export function ConversationPanel({
   events,
   conversationItems,
   isResponding,
+  modalities = ['audio', 'text'],
   onSendTextMessage,
 }: ConversationPanelProps) {
   const [textInput, setTextInput] = useState('');
@@ -210,7 +212,7 @@ export function ConversationPanel({
           )}
 
           {/* Text Input */}
-          {connected && (
+          {connected && modalities.includes('text') && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Send Text Message

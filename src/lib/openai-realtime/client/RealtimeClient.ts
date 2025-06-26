@@ -8,7 +8,6 @@ import {
   ContentType,
   MessageRole,
   Response,
-  ObjectType,
 } from '../types/core';
 import { ServerEvent, ServerEventType } from '../types/server-events';
 
@@ -55,7 +54,6 @@ export class RealtimeClient {
   };
 
   constructor(config: RealtimeClientConfig) {
-    console.log('[RealtimeClient] Constructor called with config:', config);
     this.config = config;
   }
 
@@ -145,10 +143,8 @@ export class RealtimeClient {
       };
 
       // Add local audio track (using OpenAI's exact method)
-      console.log('[RealtimeClient] Getting audio stream...');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.pc.addTrack(stream.getTracks()[0]); // Use getTracks()[0] like OpenAI
-      console.log('[RealtimeClient] Audio track added to peer connection');
+      this.pc.addTrack(stream.getTracks()[0]);
 
       // Set up data channel
       const label = this.config.dataChannelLabel || 'oai-events';
@@ -174,16 +170,6 @@ export class RealtimeClient {
 
       const url = new URL(this.config.realtimeUrl);
       url.searchParams.set('model', this.config.model || '');
-
-      console.log('[RealtimeClient] Connecting to:', url.toString());
-      console.log(
-        '[RealtimeClient] Client secret length:',
-        this.config.clientSecret?.length || 0
-      );
-      console.log(
-        '[RealtimeClient] Client secret starts with:',
-        this.config.clientSecret?.substring(0, 10) + '...'
-      );
 
       const resp = await fetch(url.toString(), {
         method: 'POST',
@@ -226,7 +212,6 @@ export class RealtimeClient {
 
     // Audio track is already added during connection, just mark as active
     this.micActive = true;
-    console.log('[RealtimeClient] Voice input started');
   }
 
   async stopVoiceInput(): Promise<void> {
@@ -235,7 +220,6 @@ export class RealtimeClient {
     // Note: We don't remove the audio track since it's needed for the connection
     // We just mark the mic as inactive for UI purposes
     this.micActive = false;
-    console.log('[RealtimeClient] Voice input stopped');
   }
 
   updateSession(config: Partial<SessionConfig>): void {
@@ -295,14 +279,13 @@ export class RealtimeClient {
     text: string,
     role: MessageRole = MessageRole.USER
   ): Promise<void> {
-    const item: Item = {
+    const item = {
       id: `item_${Date.now()}`,
       type: ItemType.MESSAGE,
       role: role,
-      object: ObjectType.ITEM,
       content: [
         {
-          type: ContentType.TEXT,
+          type: ContentType.INPUT_TEXT,
           text: text,
         },
       ],

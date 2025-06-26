@@ -156,7 +156,6 @@ export function RealtimeDemo() {
       addEvent('session_creating', { config: sessionConfig });
 
       const result = await createRealtimeSession(sessionConfig);
-      console.log('Session created:', result);
 
       if (result.success && result.clientSecret) {
         setClientSecret(result.clientSecret);
@@ -335,6 +334,7 @@ export function RealtimeDemo() {
             events={events}
             conversationItems={[]} // Simplified for now
             isResponding={isResponding}
+            modalities={sessionConfig.modalities}
             onSendTextMessage={handleSendTextMessage}
           />
         </div>

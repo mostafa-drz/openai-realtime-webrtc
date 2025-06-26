@@ -1,6 +1,11 @@
 'use client';
 
-import { SessionConfig, Voice, AudioFormat } from '@/lib/openai-realtime/types';
+import {
+  SessionConfig,
+  Voice,
+  AudioFormat,
+  Modality,
+} from '@/lib/openai-realtime/types';
 
 interface SettingsPanelProps {
   config: SessionConfig;
@@ -25,6 +30,11 @@ const AUDIO_FORMAT_OPTIONS = [
   { value: AudioFormat.G711_ALAW, label: 'G711 A-law' },
 ];
 
+const MODALITY_OPTIONS = [
+  { value: [Modality.AUDIO, Modality.TEXT], label: 'Audio + Text (Default)' },
+  { value: [Modality.TEXT], label: 'Text Only' },
+];
+
 export function SettingsPanel({
   config,
   onConfigChange,
@@ -37,6 +47,30 @@ export function SettingsPanel({
       </h3>
 
       <div className="space-y-4">
+        {/* Modality Selection */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Modalities
+          </label>
+          <select
+            value={JSON.stringify(config.modalities)}
+            onChange={(e) =>
+              onConfigChange({ modalities: JSON.parse(e.target.value) })
+            }
+            disabled={disabled}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {MODALITY_OPTIONS.map((option) => (
+              <option key={option.label} value={JSON.stringify(option.value)}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Choose whether to enable audio, text, or both modalities
+          </p>
+        </div>
+
         {/* Voice Selection */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
