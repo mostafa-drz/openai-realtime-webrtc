@@ -183,11 +183,17 @@ export function RealtimeDemo() {
   // Handle session update
   const handleUpdateSession = (newConfig: Partial<SessionConfig>) => {
     try {
-      if (clientRef.current) {
-        clientRef.current.updateSession(newConfig);
-      }
+      // Always update local config state
       setSessionConfig((prev) => ({ ...prev, ...newConfig }));
-      addEvent(ServerEventType.SESSION_UPDATED, { config: newConfig });
+
+      // Only send update to server if connected
+      if (clientRef.current && connected) {
+        clientRef.current.updateSession(newConfig);
+        addEvent(ServerEventType.SESSION_UPDATED, { config: newConfig });
+      } else {
+        // Log config change when not connected (pre-session configuration)
+        addEvent('config_updated', { config: newConfig });
+      }
     } catch (err) {
       addEvent(ServerEventType.ERROR, {
         error: err instanceof Error ? err.message : 'Unknown error',
@@ -315,7 +321,7 @@ export function RealtimeDemo() {
           <SettingsPanel
             config={sessionConfig}
             onConfigChange={handleUpdateSession}
-            disabled={!connected}
+            disabled={connected}
           />
 
           <VoiceControls
