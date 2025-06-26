@@ -138,6 +138,19 @@ export class RealtimeClient {
     try {
       this.pc = new RTCPeerConnection();
 
+      // Set up remote audio handling FIRST (like OpenAI example)
+      this.pc.ontrack = (ev) => {
+        const [trackStream] = ev.streams;
+        this.handleRemoteAudio(trackStream);
+      };
+
+      // Add local audio track (using OpenAI's exact method)
+      console.log('[RealtimeClient] Getting audio stream...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.pc.addTrack(stream.getTracks()[0]); // Use getTracks()[0] like OpenAI
+      console.log('[RealtimeClient] Audio track added to peer connection');
+
+      // Set up data channel
       const label = this.config.dataChannelLabel || 'oai-events';
       this.dataChannel = this.pc.createDataChannel(label);
       this.dataChannel.onmessage = (ev) => {
@@ -155,6 +168,7 @@ export class RealtimeClient {
         }
       };
 
+      // Create offer
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
 
@@ -192,11 +206,6 @@ export class RealtimeClient {
 
       const answerSdp = await resp.text();
       await this.pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-
-      this.pc.ontrack = (ev) => {
-        const [trackStream] = ev.streams;
-        this.handleRemoteAudio(trackStream);
-      };
     } catch (err) {
       this.updateState(ConnectionState.ERROR);
       this.config.onError?.(
@@ -215,30 +224,18 @@ export class RealtimeClient {
 
     if (this.micActive) return;
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioTrack = stream.getAudioTracks()[0];
-      this.pc.addTrack(audioTrack, stream);
-      this.micActive = true;
-    } catch (err) {
-      this.config.onError?.(
-        err instanceof Error ? err : new Error(String(err))
-      );
-    }
+    // Audio track is already added during connection, just mark as active
+    this.micActive = true;
+    console.log('[RealtimeClient] Voice input started');
   }
 
   async stopVoiceInput(): Promise<void> {
     if (!this.pc) return;
 
-    // Stop and remove all audio tracks from the peer connection
-    this.pc.getSenders().forEach((sender) => {
-      if (sender.track?.kind === 'audio') {
-        sender.track.stop();
-        this.pc?.removeTrack(sender);
-      }
-    });
-
+    // Note: We don't remove the audio track since it's needed for the connection
+    // We just mark the mic as inactive for UI purposes
     this.micActive = false;
+    console.log('[RealtimeClient] Voice input stopped');
   }
 
   updateSession(config: Partial<SessionConfig>): void {

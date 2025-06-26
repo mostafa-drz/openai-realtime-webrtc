@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRealtimeClient } from '@/lib/openai-realtime/useRealtimeClient';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { RealtimeClient } from '@/lib/openai-realtime/client/RealtimeClient';
 import {
   SessionConfig,
   Voice,
@@ -9,8 +9,6 @@ import {
   TurnDetectionType,
   ServerEvent,
   ServerEventType,
-  Item,
-  Response,
 } from '@/lib/openai-realtime/types';
 import { createRealtimeSession } from '@/lib/actions';
 import { VoiceControls } from '@/components/VoiceControls';
@@ -46,6 +44,12 @@ export function RealtimeDemo() {
   const [clientSecret, setClientSecret] = useState<string>('');
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [events, setEvents] = useState<EventLogItem[]>([]);
+  const [connected, setConnected] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [isResponding, setIsResponding] = useState(false);
+
+  const clientRef = useRef<RealtimeClient | null>(null);
 
   // Add event to log
   const addEvent = useCallback(
@@ -63,65 +67,84 @@ export function RealtimeDemo() {
     []
   );
 
-  // Initialize the realtime client with enhanced features
-  const {
-    disconnect,
-    startVoiceInput,
-    stopVoiceInput,
-    updateSession,
-    // High-level conversation methods
-    sendTextMessage,
-    requestResponse,
-    cancelResponse,
-    // Enhanced state
-    connected,
-    micEnabled,
-    error,
-    conversationItems,
-    isResponding,
-  } = useRealtimeClient({
-    clientSecret,
-    model: sessionConfig.model,
-    realtimeUrl: 'https://api.openai.com/v1/realtime',
-    autoConnect: true, // Enable auto-connection when clientSecret is available
-    onMessageToken: (token) => {
-      addEvent(ServerEventType.RESPONSE_TEXT_DELTA, { delta: token });
-    },
-    onTranscript: (transcript) => {
-      addEvent(ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA, {
-        delta: transcript,
-      });
-    },
-    onConnectionStateChange: (state) => {
-      addEvent('connection_state_change', { state });
-    },
-    onError: (err) => {
-      addEvent(ServerEventType.ERROR, { error: err.message });
-    },
-    // New high-level callbacks
-    onConversationItemCreated: (item: Item) => {
-      addEvent(ServerEventType.CONVERSATION_ITEM_CREATED, { item });
-    },
-    onResponseCreated: (response: Response) => {
-      addEvent(ServerEventType.RESPONSE_CREATED, { response });
-    },
-    onResponseDone: (response: Response) => {
-      addEvent(ServerEventType.RESPONSE_DONE, { response });
-    },
-    onSpeechStarted: () => {
-      addEvent(ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED, {});
-    },
-    onSpeechStopped: () => {
-      addEvent(ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED, {});
-    },
-    // Raw event access for advanced logging
-    onRawEvent: (event: ServerEvent) => {
-      addEvent(event.type, {
-        event_id: event.event_id,
-        data: event,
-      });
-    },
-  });
+  // Create client when clientSecret changes
+  useEffect(() => {
+    if (!clientSecret) {
+      clientRef.current = null;
+      return;
+    }
+
+    if (clientRef.current) {
+      clientRef.current.disconnect();
+    }
+
+    clientRef.current = new RealtimeClient({
+      clientSecret,
+      model: sessionConfig.model,
+      realtimeUrl: 'https://api.openai.com/v1/realtime',
+      onMessageToken: (token) => {
+        addEvent(ServerEventType.RESPONSE_TEXT_DELTA, { delta: token });
+      },
+      onTranscript: (transcript) => {
+        addEvent(ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA, {
+          delta: transcript,
+        });
+      },
+      onConnectionStateChange: (state) => {
+        setConnected(state === 'connected');
+        addEvent('connection_state_change', { state });
+      },
+      onError: (err) => {
+        setError(err);
+        addEvent(ServerEventType.ERROR, { error: err.message });
+      },
+      onConversationItemCreated: (item) => {
+        addEvent(ServerEventType.CONVERSATION_ITEM_CREATED, { item });
+      },
+      onResponseCreated: (response) => {
+        setIsResponding(true);
+        addEvent(ServerEventType.RESPONSE_CREATED, { response });
+      },
+      onResponseDone: (response) => {
+        setIsResponding(false);
+        addEvent(ServerEventType.RESPONSE_DONE, { response });
+      },
+      onSpeechStarted: () => {
+        addEvent(ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED, {});
+      },
+      onSpeechStopped: () => {
+        addEvent(ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED, {});
+      },
+      onRawEvent: (event: ServerEvent) => {
+        addEvent(event.type, {
+          event_id: event.event_id,
+          data: event,
+        });
+      },
+    });
+
+    // Auto-connect
+    const connectClient = async () => {
+      try {
+        await clientRef.current!.connect();
+        addEvent('client_connected', {});
+      } catch (err) {
+        addEvent(ServerEventType.ERROR, {
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    };
+    connectClient();
+  }, [clientSecret, sessionConfig.model, addEvent]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (clientRef.current) {
+        clientRef.current.disconnect();
+      }
+    };
+  }, []);
 
   // Handle session creation using server action
   const handleCreateSession = async () => {
@@ -138,10 +161,6 @@ export function RealtimeDemo() {
           sessionId: result.sessionId,
           config: result.config,
         });
-
-        // The hook will automatically connect when clientSecret changes
-        // No need to manually call connect() anymore
-        addEvent('session_connected', { sessionId: result.sessionId });
       } else {
         addEvent(ServerEventType.ERROR, {
           error: result.error || 'Failed to create session',
@@ -160,7 +179,9 @@ export function RealtimeDemo() {
   // Handle session update
   const handleUpdateSession = (newConfig: Partial<SessionConfig>) => {
     try {
-      updateSession(newConfig);
+      if (clientRef.current) {
+        clientRef.current.updateSession(newConfig);
+      }
       setSessionConfig((prev) => ({ ...prev, ...newConfig }));
       addEvent(ServerEventType.SESSION_UPDATED, { config: newConfig });
     } catch (err) {
@@ -172,14 +193,16 @@ export function RealtimeDemo() {
 
   // Handle voice input toggle
   const handleVoiceToggle = async () => {
-    if (!connected) return;
+    if (!clientRef.current || !connected) return;
 
     try {
       if (micEnabled) {
-        stopVoiceInput();
+        clientRef.current.stopVoiceInput();
+        setMicEnabled(false);
         addEvent('voice_stopped', {});
       } else {
-        await startVoiceInput();
+        await clientRef.current.startVoiceInput();
+        setMicEnabled(true);
         addEvent('voice_started', {});
       }
     } catch (err) {
@@ -189,16 +212,16 @@ export function RealtimeDemo() {
     }
   };
 
-  // Handle text message sending (new feature)
+  // Handle text message sending
   const handleSendTextMessage = async (text: string) => {
-    if (!connected || !text.trim()) return;
+    if (!clientRef.current || !connected || !text.trim()) return;
 
     try {
-      await sendTextMessage(text);
+      await clientRef.current.sendTextMessage(text);
       addEvent('text_message_sent', { text });
 
       // Automatically request response
-      await requestResponse();
+      await clientRef.current.requestResponse();
       addEvent('response_requested', {});
     } catch (err) {
       addEvent(ServerEventType.ERROR, {
@@ -207,12 +230,12 @@ export function RealtimeDemo() {
     }
   };
 
-  // Handle response cancellation (new feature)
+  // Handle response cancellation
   const handleCancelResponse = async () => {
-    if (!connected || !isResponding) return;
+    if (!clientRef.current || !connected || !isResponding) return;
 
     try {
-      await cancelResponse('User cancelled');
+      await clientRef.current.cancelResponse('User cancelled');
       addEvent(ServerEventType.RESPONSE_CANCELLED, {
         reason: 'User cancelled',
       });
@@ -225,8 +248,13 @@ export function RealtimeDemo() {
 
   // Handle disconnect
   const handleDisconnect = () => {
-    disconnect();
-    setClientSecret(''); // Clear clientSecret to trigger hook cleanup
+    if (clientRef.current) {
+      clientRef.current.disconnect();
+    }
+    setClientSecret('');
+    setConnected(false);
+    setMicEnabled(false);
+    setError(null);
     addEvent('session_disconnected', {});
   };
 
@@ -300,7 +328,7 @@ export function RealtimeDemo() {
           <ConversationPanel
             connected={connected}
             events={events}
-            conversationItems={conversationItems}
+            conversationItems={[]} // Simplified for now
             isResponding={isResponding}
             onSendTextMessage={handleSendTextMessage}
           />
@@ -314,7 +342,7 @@ export function RealtimeDemo() {
           micEnabled={micEnabled}
           error={error}
           isResponding={isResponding}
-          conversationItemCount={conversationItems.length}
+          conversationItemCount={0} // Simplified for now
         />
 
         <EventLog events={events} />
