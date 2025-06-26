@@ -55,6 +55,7 @@ export class RealtimeClient {
   };
 
   constructor(config: RealtimeClientConfig) {
+    console.log('[RealtimeClient] Constructor called with config:', config);
     this.config = config;
   }
 

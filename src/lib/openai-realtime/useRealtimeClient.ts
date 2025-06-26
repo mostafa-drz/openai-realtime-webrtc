@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   RealtimeClient,
   RealtimeClientConfig,
@@ -20,6 +20,7 @@ export interface UseRealtimeClientConfig extends RealtimeClientConfig {
   onSpeechStarted?: () => void;
   onSpeechStopped?: () => void;
   onRawEvent?: (event: ServerEvent) => void;
+  autoConnect?: boolean;
 }
 
 export function useRealtimeClient(config: UseRealtimeClientConfig) {
@@ -35,113 +36,214 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
     }
   );
 
-  if (!clientRef.current) {
-    clientRef.current = new RealtimeClient({
-      ...config,
-      onMessageToken: (token) => config.onMessageToken?.(token),
-      onTranscript: (transcript) => config.onTranscript?.(transcript),
-      onError: (err) => {
-        setError(err);
-        config.onError?.(err);
-      },
-      onConversationItemCreated: (item) => {
-        setConversationState((prev) => ({
-          ...prev,
-          items: [...prev.items, item],
-        }));
-        config.onConversationItemCreated?.(item);
-      },
-      onResponseCreated: (response) => {
-        setConversationState((prev) => ({
-          ...prev,
-          currentResponseId: response.id,
-          isResponding: true,
-        }));
-        config.onResponseCreated?.(response);
-      },
-      onResponseDone: (response) => {
-        setConversationState((prev) => ({
-          ...prev,
-          isResponding: false,
-        }));
-        config.onResponseDone?.(response);
-      },
-      onSpeechStarted: () => {
-        config.onSpeechStarted?.();
-      },
-      onSpeechStopped: () => {
-        config.onSpeechStopped?.();
-      },
-      onRawEvent: (event) => {
-        config.onRawEvent?.(event);
-      },
-    });
-  }
+  const prevClientSecretRef = useRef<string>('');
+
+  const createClient = useCallback(() => {
+    if (!config.clientSecret) {
+      clientRef.current = null;
+      return;
+    }
+
+    if (prevClientSecretRef.current !== config.clientSecret) {
+      if (clientRef.current) {
+        clientRef.current.disconnect();
+      }
+
+      clientRef.current = new RealtimeClient({
+        ...config,
+        onMessageToken: (token) => config.onMessageToken?.(token),
+        onTranscript: (transcript) => config.onTranscript?.(transcript),
+        onError: (err) => {
+          setError(err);
+          config.onError?.(err);
+        },
+        onConversationItemCreated: (item) => {
+          setConversationState((prev) => ({
+            ...prev,
+            items: [...prev.items, item],
+          }));
+          config.onConversationItemCreated?.(item);
+        },
+        onResponseCreated: (response) => {
+          setConversationState((prev) => ({
+            ...prev,
+            currentResponseId: response.id,
+            isResponding: true,
+          }));
+          config.onResponseCreated?.(response);
+        },
+        onResponseDone: (response) => {
+          setConversationState((prev) => ({
+            ...prev,
+            isResponding: false,
+          }));
+          config.onResponseDone?.(response);
+        },
+        onSpeechStarted: () => {
+          config.onSpeechStarted?.();
+        },
+        onSpeechStopped: () => {
+          config.onSpeechStopped?.();
+        },
+        onRawEvent: (event) => {
+          config.onRawEvent?.(event);
+        },
+      });
+
+      prevClientSecretRef.current = config.clientSecret;
+    }
+  }, [config]);
+
+  useEffect(() => {
+    createClient();
+
+    if (
+      config.autoConnect &&
+      config.clientSecret &&
+      clientRef.current &&
+      !connected
+    ) {
+      const connectClient = async () => {
+        try {
+          await clientRef.current!.connect();
+          setConnected(true);
+        } catch (err) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
+      connectClient();
+    }
+  }, [config.clientSecret, config.autoConnect, createClient, connected]);
 
   useEffect(() => {
     return () => {
-      clientRef.current?.disconnect();
-      clientRef.current = null;
+      if (clientRef.current) {
+        clientRef.current.disconnect();
+        clientRef.current = null;
+      }
     };
   }, []);
 
-  const connect = async () => {
-    if (!clientRef.current) return;
-    await clientRef.current.connect();
-    setConnected(true);
-  };
+  const connect = useCallback(async () => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
 
-  const disconnect = () => {
-    clientRef.current?.disconnect();
+    try {
+      await clientRef.current.connect();
+      setConnected(true);
+      setError(null);
+    } catch (err) {
+      setConnected(false);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      throw err;
+    }
+  }, []);
+
+  const disconnect = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.disconnect();
+    }
     setConnected(false);
     setMicEnabled(false);
-  };
+    setError(null);
+  }, []);
 
-  const startVoiceInput = async () => {
-    if (!clientRef.current) return;
+  const startVoiceInput = useCallback(async () => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
     await clientRef.current.startVoiceInput();
     setMicEnabled(true);
-  };
+  }, []);
 
-  const stopVoiceInput = () => {
-    clientRef.current?.stopVoiceInput();
+  const stopVoiceInput = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.stopVoiceInput();
+    }
     setMicEnabled(false);
-  };
+  }, []);
 
-  const updateSession = (session: Partial<SessionConfig>) => {
-    clientRef.current?.updateSession(session);
-  };
+  const updateSession = useCallback((session: Partial<SessionConfig>) => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
 
-  // High-level conversation methods
-  const sendTextMessage = async (text: string, role?: MessageRole) => {
-    if (!clientRef.current) return;
-    await clientRef.current.sendTextMessage(text, role);
-  };
+    clientRef.current.updateSession(session);
+  }, []);
 
-  const requestResponse = async (options?: Partial<ResponseConfig>) => {
-    if (!clientRef.current) return;
-    await clientRef.current.requestResponse(options);
-  };
+  const sendTextMessage = useCallback(
+    async (text: string, role?: MessageRole) => {
+      if (!clientRef.current) {
+        throw new Error(
+          'No client available. Please ensure clientSecret is provided.'
+        );
+      }
 
-  const cancelResponse = async (reason?: string) => {
-    if (!clientRef.current) return;
+      await clientRef.current.sendTextMessage(text, role);
+    },
+    []
+  );
+
+  const requestResponse = useCallback(
+    async (options?: Partial<ResponseConfig>) => {
+      if (!clientRef.current) {
+        throw new Error(
+          'No client available. Please ensure clientSecret is provided.'
+        );
+      }
+
+      await clientRef.current.requestResponse(options);
+    },
+    []
+  );
+
+  const cancelResponse = useCallback(async (reason?: string) => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
     await clientRef.current.cancelResponse(reason);
-  };
+  }, []);
 
-  const commitAudioBuffer = async () => {
-    if (!clientRef.current) return;
+  const commitAudioBuffer = useCallback(async () => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
     await clientRef.current.commitAudioBuffer();
-  };
+  }, []);
 
-  const clearAudioBuffer = async () => {
-    if (!clientRef.current) return;
+  const clearAudioBuffer = useCallback(async () => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
     await clientRef.current.clearAudioBuffer();
-  };
+  }, []);
 
-  const clearOutputAudioBuffer = async () => {
-    if (!clientRef.current) return;
+  const clearOutputAudioBuffer = useCallback(async () => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
     await clientRef.current.clearOutputAudioBuffer();
-  };
+  }, []);
 
   return {
     client: clientRef.current,
@@ -150,14 +252,12 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
     startVoiceInput,
     stopVoiceInput,
     updateSession,
-    // High-level conversation methods
     sendTextMessage,
     requestResponse,
     cancelResponse,
     commitAudioBuffer,
     clearAudioBuffer,
     clearOutputAudioBuffer,
-    // State
     connected,
     micEnabled,
     error,
@@ -165,5 +265,6 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
     conversationItems: conversationState.items,
     isResponding: conversationState.isResponding,
     currentResponseId: conversationState.currentResponseId,
+    hasClient: !!clientRef.current,
   };
 }

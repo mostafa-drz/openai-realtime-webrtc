@@ -1,5 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+import {
+  Item,
+  MessageRole,
+  ContentType,
+  ServerEventType,
+} from '@/lib/openai-realtime/types';
+
 interface EventLogItem {
   id: string;
   type: string;
@@ -10,37 +18,121 @@ interface EventLogItem {
 interface ConversationPanelProps {
   connected: boolean;
   events: EventLogItem[];
+  conversationItems: Item[];
+  isResponding: boolean;
+  onSendTextMessage: (text: string) => void;
 }
 
 export function ConversationPanel({
   connected,
   events,
+  conversationItems,
+  isResponding,
+  onSendTextMessage,
 }: ConversationPanelProps) {
-  // Group events by conversation flow
+  const [textInput, setTextInput] = useState('');
+
+  // Group events by conversation flow using real event types
   const conversationEvents = events.filter((event) =>
     [
-      'message_token',
-      'transcript',
-      'connection_state',
-      'session_created',
-      'session_updated',
+      ServerEventType.RESPONSE_TEXT_DELTA,
+      ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA,
+      'connection_state_change',
+      ServerEventType.SESSION_CREATED,
+      ServerEventType.SESSION_UPDATED,
+      ServerEventType.CONVERSATION_ITEM_CREATED,
+      ServerEventType.RESPONSE_CREATED,
+      ServerEventType.RESPONSE_DONE,
+      ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED,
+      ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED,
     ].includes(event.type)
   );
 
-  // Get current conversation state
+  // Get current conversation state from events
   const currentTranscript = events
-    .filter((e) => e.type === 'transcript')
-    .map((e) => e.data.transcript as string)
+    .filter((e) => e.type === ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA)
+    .map((e) => e.data.delta as string)
     .join(' ');
 
   const currentResponse = events
-    .filter((e) => e.type === 'message_token')
-    .map((e) => e.data.token as string)
+    .filter((e) => e.type === ServerEventType.RESPONSE_TEXT_DELTA)
+    .map((e) => e.data.delta as string)
     .join('');
 
   const connectionState =
-    (events.filter((e) => e.type === 'connection_state').pop()?.data
+    (events.filter((e) => e.type === 'connection_state_change').pop()?.data
       .state as string) || 'disconnected';
+
+  // Handle text message submission
+  const handleSendMessage = () => {
+    if (textInput.trim() && connected) {
+      onSendTextMessage(textInput.trim());
+      setTextInput('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Render conversation items
+  const renderConversationItems = () => {
+    return conversationItems.map((item, index) => {
+      if (item.type === 'message') {
+        const isUser = item.role === MessageRole.USER;
+        const textContent = item.content.find(
+          (content) => content.type === ContentType.TEXT
+        );
+
+        if (textContent && 'text' in textContent) {
+          return (
+            <div
+              key={item.id || index}
+              className={`p-4 rounded-lg ${
+                isUser
+                  ? 'bg-blue-50 dark:bg-blue-900/20'
+                  : 'bg-green-50 dark:bg-green-900/20'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`w-8 h-8 text-white rounded-full flex items-center justify-center text-sm font-medium ${
+                    isUser ? 'bg-blue-600' : 'bg-green-600'
+                  }`}
+                >
+                  {isUser ? 'U' : 'AI'}
+                </div>
+                <div className="flex-1">
+                  <p
+                    className={`text-sm font-medium mb-1 ${
+                      isUser
+                        ? 'text-blue-900 dark:text-blue-100'
+                        : 'text-green-900 dark:text-green-100'
+                    }`}
+                  >
+                    {isUser ? 'You said:' : 'AI Response:'}
+                  </p>
+                  <p
+                    className={
+                      isUser
+                        ? 'text-blue-800 dark:text-blue-200'
+                        : 'text-green-800 dark:text-green-200'
+                    }
+                  >
+                    {textContent.text}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+      }
+      return null;
+    });
+  };
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
@@ -68,69 +160,110 @@ export function ConversationPanel({
 
         {/* Conversation Flow */}
         <div className="space-y-4">
-          {/* User Input */}
-          {currentTranscript && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                  U
+          {/* Conversation Items */}
+          {conversationItems.length > 0 && (
+            <div className="space-y-4">{renderConversationItems()}</div>
+          )}
+
+          {/* Current Live Input/Response */}
+          {(currentTranscript || currentResponse) && (
+            <div className="space-y-4">
+              {/* User Input */}
+              {currentTranscript && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                      U
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                        You said:
+                      </p>
+                      <p className="text-blue-800 dark:text-blue-200">
+                        &quot;{currentTranscript}&quot;
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                    You said:
-                  </p>
-                  <p className="text-blue-800 dark:text-blue-200">
-                    &quot;{currentTranscript}&quot;
-                  </p>
+              )}
+
+              {/* AI Response */}
+              {currentResponse && (
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                      AI
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
+                        AI Response:
+                      </p>
+                      <p className="text-green-800 dark:text-green-200">
+                        {currentResponse}
+                        <span className="inline-block w-2 h-4 bg-green-600 dark:bg-green-400 ml-1 animate-pulse" />
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* AI Response */}
-          {currentResponse && (
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                  AI
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
-                    AI Response:
-                  </p>
-                  <p className="text-green-800 dark:text-green-200">
-                    {currentResponse}
-                    <span className="inline-block w-2 h-4 bg-green-600 dark:bg-green-400 ml-1 animate-pulse" />
-                  </p>
-                </div>
+          {/* Text Input */}
+          {connected && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Send Text Message
+              </label>
+              <div className="flex gap-2">
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your message..."
+                  disabled={isResponding}
+                  className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                  rows={2}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!textInput.trim() || isResponding}
+                  className="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium self-end"
+                >
+                  Send
+                </button>
               </div>
             </div>
           )}
 
           {/* Empty State */}
-          {!currentTranscript && !currentResponse && connected && (
-            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-              <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
-                <svg
-                  className="w-8 h-8"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                  />
-                </svg>
+          {!currentTranscript &&
+            !currentResponse &&
+            conversationItems.length === 0 &&
+            connected && (
+              <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-lg font-medium mb-2">Ready to Chat</p>
+                <p className="text-sm">
+                  Use voice recording or type a message to begin your
+                  conversation
+                </p>
               </div>
-              <p className="text-lg font-medium mb-2">Ready to Chat</p>
-              <p className="text-sm">
-                Click &quot;Start Recording&quot; to begin your conversation
-              </p>
-            </div>
-          )}
+            )}
 
           {/* Not Connected State */}
           {!connected && (
@@ -151,16 +284,15 @@ export function ConversationPanel({
                 </svg>
               </div>
               <p className="text-lg font-medium mb-2">Not Connected</p>
-              <p className="text-sm">
-                Enter a client secret and connect to start chatting
-              </p>
+              <p className="text-sm">Create a session to start chatting</p>
             </div>
           )}
         </div>
 
         {/* Event Counter */}
         <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
-          {conversationEvents.length} events logged
+          {conversationEvents.length} events logged • {conversationItems.length}{' '}
+          conversation items
         </div>
       </div>
     </div>

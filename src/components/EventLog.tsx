@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ServerEventType } from '@/lib/openai-realtime/types';
 
 interface EventLogItem {
   id: string;
@@ -17,51 +18,171 @@ export function EventLog({ events }: EventLogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getEventColor = (type: string) => {
+    // Use real event types for better categorization
     switch (type) {
-      case 'message_token':
+      // Text and audio streaming events
+      case ServerEventType.RESPONSE_TEXT_DELTA:
         return 'text-green-600 dark:text-green-400';
-      case 'transcript':
+      case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA:
         return 'text-blue-600 dark:text-blue-400';
-      case 'connection_state':
+      case ServerEventType.RESPONSE_AUDIO_DELTA:
         return 'text-purple-600 dark:text-purple-400';
-      case 'error':
-      case 'session_error':
-      case 'voice_error':
-      case 'update_error':
-        return 'text-red-600 dark:text-red-400';
-      case 'session_created':
-      case 'session_updated':
+
+      // Connection and session events
+      case 'connection_state_change':
+        return 'text-indigo-600 dark:text-indigo-400';
+      case ServerEventType.SESSION_CREATED:
+      case ServerEventType.SESSION_UPDATED:
         return 'text-orange-600 dark:text-orange-400';
+
+      // Conversation events
+      case ServerEventType.CONVERSATION_ITEM_CREATED:
+        return 'text-emerald-600 dark:text-emerald-400';
+      case ServerEventType.CONVERSATION_ITEM_DELETED:
+        return 'text-red-600 dark:text-red-400';
+
+      // Response events
+      case ServerEventType.RESPONSE_CREATED:
+        return 'text-cyan-600 dark:text-cyan-400';
+      case ServerEventType.RESPONSE_DONE:
+        return 'text-green-600 dark:text-green-400';
+      case ServerEventType.RESPONSE_CANCELLED:
+        return 'text-yellow-600 dark:text-yellow-400';
+
+      // Speech detection events
+      case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED:
+        return 'text-pink-600 dark:text-pink-400';
+      case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED:
+        return 'text-gray-600 dark:text-gray-400';
+
+      // Audio buffer events
+      case ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED:
+      case ServerEventType.INPUT_AUDIO_BUFFER_CLEARED:
+        return 'text-violet-600 dark:text-violet-400';
+
+      // Error events
+      case ServerEventType.ERROR:
+        return 'text-red-600 dark:text-red-400';
+
+      // Custom events
       case 'voice_started':
       case 'voice_stopped':
         return 'text-indigo-600 dark:text-indigo-400';
+      case 'text_message_sent':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'response_requested':
+        return 'text-cyan-600 dark:text-cyan-400';
+      case 'session_creating':
+      case 'session_connected':
+      case 'session_disconnected':
+        return 'text-orange-600 dark:text-orange-400';
+
       default:
         return 'text-slate-600 dark:text-slate-400';
     }
   };
 
   const getEventIcon = (type: string) => {
+    // Use real event types for better icon mapping
     switch (type) {
-      case 'message_token':
+      // Text and audio streaming events
+      case ServerEventType.RESPONSE_TEXT_DELTA:
         return '💬';
-      case 'transcript':
+      case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA:
         return '🎤';
-      case 'connection_state':
+      case ServerEventType.RESPONSE_AUDIO_DELTA:
+        return '🔊';
+
+      // Connection and session events
+      case 'connection_state_change':
         return '🔗';
-      case 'error':
-      case 'session_error':
-      case 'voice_error':
-      case 'update_error':
-        return '❌';
-      case 'session_created':
-      case 'session_updated':
+      case ServerEventType.SESSION_CREATED:
+        return '✨';
+      case ServerEventType.SESSION_UPDATED:
         return '⚙️';
+
+      // Conversation events
+      case ServerEventType.CONVERSATION_ITEM_CREATED:
+        return '💭';
+      case ServerEventType.CONVERSATION_ITEM_DELETED:
+        return '🗑️';
+
+      // Response events
+      case ServerEventType.RESPONSE_CREATED:
+        return '🚀';
+      case ServerEventType.RESPONSE_DONE:
+        return '✅';
+      case ServerEventType.RESPONSE_CANCELLED:
+        return '⏹️';
+
+      // Speech detection events
+      case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED:
+        return '🎙️';
+      case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED:
+        return '🔇';
+
+      // Audio buffer events
+      case ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED:
+        return '📤';
+      case ServerEventType.INPUT_AUDIO_BUFFER_CLEARED:
+        return '🧹';
+
+      // Error events
+      case ServerEventType.ERROR:
+        return '❌';
+
+      // Custom events
       case 'voice_started':
         return '🎙️';
       case 'voice_stopped':
         return '🔇';
+      case 'text_message_sent':
+        return '📝';
+      case 'response_requested':
+        return '🤔';
+      case 'session_creating':
+        return '⏳';
+      case 'session_connected':
+        return '✅';
+      case 'session_disconnected':
+        return '🔌';
+
       default:
         return '📝';
+    }
+  };
+
+  const getEventDescription = (type: string) => {
+    // Provide human-readable descriptions for event types
+    switch (type) {
+      case ServerEventType.RESPONSE_TEXT_DELTA:
+        return 'AI text streaming';
+      case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA:
+        return 'Audio transcript streaming';
+      case ServerEventType.RESPONSE_AUDIO_DELTA:
+        return 'AI audio streaming';
+      case 'connection_state_change':
+        return 'Connection state changed';
+      case ServerEventType.SESSION_CREATED:
+        return 'Session created';
+      case ServerEventType.SESSION_UPDATED:
+        return 'Session updated';
+      case ServerEventType.CONVERSATION_ITEM_CREATED:
+        return 'Conversation item created';
+      case ServerEventType.RESPONSE_CREATED:
+        return 'AI response started';
+      case ServerEventType.RESPONSE_DONE:
+        return 'AI response completed';
+      case ServerEventType.RESPONSE_CANCELLED:
+        return 'AI response cancelled';
+      case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED:
+        return 'Speech detected';
+      case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED:
+        return 'Speech ended';
+      case ServerEventType.ERROR:
+        return 'Error occurred';
+      default:
+        return type;
     }
   };
 
@@ -125,14 +246,17 @@ export function EventLog({ events }: EventLogProps) {
                           <span
                             className={`text-sm font-medium ${getEventColor(event.type)}`}
                           >
-                            {event.type}
+                            {getEventDescription(event.type)}
                           </span>
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             {event.timestamp.toLocaleTimeString()}
                           </span>
                         </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          {event.type}
+                        </div>
                         <div className="text-sm text-slate-700 dark:text-slate-300">
-                          <pre className="whitespace-pre-wrap break-words">
+                          <pre className="whitespace-pre-wrap break-words text-xs">
                             {JSON.stringify(event.data, null, 2)}
                           </pre>
                         </div>
