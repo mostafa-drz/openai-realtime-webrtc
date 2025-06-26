@@ -2,12 +2,14 @@ import { SessionConfig, CreateSessionResponse } from '../types';
 
 export interface ServerRealtimeClientConfig {
   baseUrl: string;
+  apiKey: string;
 }
 
 export const defaultServerRealtimeClientConfig: ServerRealtimeClientConfig = {
   baseUrl:
     process.env.OPENAI_REALTIME_SESSION_URL ||
     'https://api.openai.com/v1/realtime/sessions',
+  apiKey: process.env.OPENAI_API_KEY || '',
 };
 
 export async function createSession(
@@ -15,11 +17,12 @@ export async function createSession(
   options: Partial<ServerRealtimeClientConfig> = {}
 ): Promise<CreateSessionResponse> {
   const baseUrl = options.baseUrl || defaultServerRealtimeClientConfig.baseUrl;
+  const apiKey = options.apiKey || defaultServerRealtimeClientConfig.apiKey;
 
   const response = await fetch(baseUrl, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(config),

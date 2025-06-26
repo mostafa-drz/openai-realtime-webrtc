@@ -398,12 +398,14 @@ See [DEMO_README.md](./DEMO_README.md) for detailed demo documentation.
 #### **Environment-Specific Setup**
 
 **Development:**
+
 ```env
 OPENAI_API_KEY=your_dev_key
 NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
 ```
 
 **Production:**
+
 ```env
 OPENAI_API_KEY=your_prod_key
 OPENAI_API_BASE_URL=https://api.openai.com/v1
@@ -413,6 +415,7 @@ NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
 ```
 
 **Custom Endpoints:**
+
 ```env
 # For custom OpenAI-compatible endpoints
 OPENAI_API_BASE_URL=https://your-custom-endpoint.com/v1
