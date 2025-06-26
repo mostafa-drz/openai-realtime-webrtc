@@ -14,7 +14,6 @@ import { createRealtimeSession } from '@/lib/actions';
 import { ConversationPanel } from '@/components/ConversationPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { EventLog } from '@/components/EventLog';
-import { StatusBar } from '@/components/StatusBar';
 
 // Default session configuration
 const defaultSessionConfig: SessionConfig = {
@@ -44,11 +43,13 @@ export function RealtimeDemo() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [events, setEvents] = useState<EventLogItem[]>([]);
   const [connected, setConnected] = useState(false);
-  const [micEnabled, setMicEnabled] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [isResponding, setIsResponding] = useState(false);
 
   const clientRef = useRef<RealtimeClient | null>(null);
+
+  // Collapsible state for session settings
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Add event to log
   const addEvent = useCallback(
@@ -167,7 +168,6 @@ export function RealtimeDemo() {
         try {
           if (clientRef.current) {
             await clientRef.current.startVoiceInput();
-            setMicEnabled(true);
             addEvent('voice_started', {});
           }
         } catch (voiceErr) {
@@ -238,20 +238,55 @@ export function RealtimeDemo() {
     }
     setClientSecret('');
     setConnected(false);
-    setMicEnabled(false);
     setError(null);
     addEvent('session_disconnected', {});
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Configuration Section */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 mb-6">
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* 1. Connection State */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                connected ? 'bg-green-500' : 'bg-gray-400'
+              }`}
+            />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {connected ? 'Connected' : 'Disconnected'}
+            </span>
+            {clientSecret && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Session: {clientSecret.substring(0, 8)}...
+              </span>
+            )}
+          </div>
+          {connected && (
+            <button
+              onClick={handleDisconnect}
+              className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Disconnect
+            </button>
+          )}
+        </div>
+        {error && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <p className="text-sm text-red-700 dark:text-red-300">
+              Error: {error.message}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 2. Session Management */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
           Session Management
         </h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-4">
           {/* Session Creation */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -272,59 +307,57 @@ export function RealtimeDemo() {
             </button>
           </div>
 
-          {/* Connection Controls */}
-          <div className="flex items-end gap-3">
+          {/* Collapsible Session Settings */}
+          <div>
             <button
-              onClick={handleDisconnect}
-              disabled={!connected}
-              className="px-4 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              onClick={() => setSettingsOpen((open) => !open)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-700 rounded-md font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              aria-expanded={settingsOpen}
+              aria-controls="session-settings-panel"
             >
-              Disconnect
+              <span>Session Settings</span>
+              <svg
+                className={`w-5 h-5 ml-2 transition-transform ${settingsOpen ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
             </button>
-
-            {clientSecret && (
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                Session: {clientSecret.substring(0, 8)}...
+            {settingsOpen && (
+              <div id="session-settings-panel" className="mt-4">
+                <SettingsPanel
+                  config={sessionConfig}
+                  onConfigChange={handleUpdateSession}
+                  disabled={connected}
+                />
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Main Demo Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Panel - Settings & Controls */}
-        <div className="space-y-6">
-          <SettingsPanel
-            config={sessionConfig}
-            onConfigChange={handleUpdateSession}
-            disabled={connected}
-          />
-        </div>
-
-        {/* Center Panel - Conversation */}
-        <div className="lg:col-span-2">
-          <ConversationPanel
-            connected={connected}
-            events={events}
-            conversationItems={[]} // Simplified for now
-            isResponding={isResponding}
-            modalities={sessionConfig.modalities}
-            onSendTextMessage={handleSendTextMessage}
-          />
-        </div>
+      {/* 3. Conversation Panel */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
+        <ConversationPanel
+          connected={connected}
+          events={events}
+          conversationItems={[]} // Simplified for now
+          isResponding={isResponding}
+          modalities={sessionConfig.modalities}
+          onSendTextMessage={handleSendTextMessage}
+        />
       </div>
 
-      {/* Bottom Panel - Status & Events */}
-      <div className="mt-6 space-y-6">
-        <StatusBar
-          connected={connected}
-          micEnabled={micEnabled}
-          error={error}
-          isResponding={isResponding}
-          conversationItemCount={0} // Simplified for now
-        />
-
+      {/* 4. Event Log */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
         <EventLog events={events} />
       </div>
     </div>
