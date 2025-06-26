@@ -11,7 +11,6 @@ import {
   ServerEventType,
 } from '@/lib/openai-realtime/types';
 import { createRealtimeSession } from '@/lib/actions';
-import { VoiceControls } from '@/components/VoiceControls';
 import { ConversationPanel } from '@/components/ConversationPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { EventLog } from '@/components/EventLog';
@@ -163,6 +162,19 @@ export function RealtimeDemo() {
           sessionId: result.sessionId,
           config: result.config,
         });
+
+        // Automatically start recording after successful session creation
+        try {
+          if (clientRef.current) {
+            await clientRef.current.startVoiceInput();
+            setMicEnabled(true);
+            addEvent('voice_started', {});
+          }
+        } catch (voiceErr) {
+          addEvent(ServerEventType.ERROR, {
+            error: `Session created but failed to start recording: ${voiceErr instanceof Error ? voiceErr.message : 'Unknown error'}`,
+          });
+        }
       } else {
         setError(new Error(result.error || 'Failed to create session'));
         addEvent(ServerEventType.ERROR, {
@@ -201,27 +213,6 @@ export function RealtimeDemo() {
     }
   };
 
-  // Handle voice input toggle
-  const handleVoiceToggle = async () => {
-    if (!clientRef.current || !connected) return;
-
-    try {
-      if (micEnabled) {
-        clientRef.current.stopVoiceInput();
-        setMicEnabled(false);
-        addEvent('voice_stopped', {});
-      } else {
-        await clientRef.current.startVoiceInput();
-        setMicEnabled(true);
-        addEvent('voice_started', {});
-      }
-    } catch (err) {
-      addEvent(ServerEventType.ERROR, {
-        error: err instanceof Error ? err.message : 'Unknown error',
-      });
-    }
-  };
-
   // Handle text message sending
   const handleSendTextMessage = async (text: string) => {
     if (!clientRef.current || !connected || !text.trim()) return;
@@ -233,22 +224,6 @@ export function RealtimeDemo() {
       // Automatically request response
       await clientRef.current.requestResponse();
       addEvent('response_requested', {});
-    } catch (err) {
-      addEvent(ServerEventType.ERROR, {
-        error: err instanceof Error ? err.message : 'Unknown error',
-      });
-    }
-  };
-
-  // Handle response cancellation
-  const handleCancelResponse = async () => {
-    if (!clientRef.current || !connected || !isResponding) return;
-
-    try {
-      await clientRef.current.cancelResponse('User cancelled');
-      addEvent(ServerEventType.RESPONSE_CANCELLED, {
-        reason: 'User cancelled',
-      });
     } catch (err) {
       addEvent(ServerEventType.ERROR, {
         error: err instanceof Error ? err.message : 'Unknown error',
@@ -280,18 +255,20 @@ export function RealtimeDemo() {
           {/* Session Creation */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Create New Session
+              Start Session & Recording
             </label>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
               Click the button below to create a new OpenAI Realtime session
-              with your current settings.
+              with your current settings and automatically start recording.
             </p>
             <button
               onClick={handleCreateSession}
               disabled={isCreatingSession || connected}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {isCreatingSession ? 'Creating Session...' : 'Start New Session'}
+              {isCreatingSession
+                ? 'Starting Session...'
+                : 'Start Session & Recording'}
             </button>
           </div>
 
@@ -322,14 +299,6 @@ export function RealtimeDemo() {
             config={sessionConfig}
             onConfigChange={handleUpdateSession}
             disabled={connected}
-          />
-
-          <VoiceControls
-            connected={connected}
-            micEnabled={micEnabled}
-            onVoiceToggle={handleVoiceToggle}
-            isResponding={isResponding}
-            onCancelResponse={handleCancelResponse}
           />
         </div>
 
