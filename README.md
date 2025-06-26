@@ -11,7 +11,66 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 - `useRealtimeClient` React hook with state management
 - **Comprehensive Event System** - Raw event access with high-level APIs
 - **NEW: Comprehensive Demo App** - Full-featured UI showcasing all capabilities
+- **Environment Configuration** - Fully configurable via environment variables
 - Future-ready structure for publishing as an npm package
+
+### 🚀 Quick Start
+
+#### **Prerequisites**
+
+- Node.js 18+ and npm
+- OpenAI API key with Realtime API access
+- Modern browser with WebRTC support
+
+#### **Installation**
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd openai-realtime-webrtc
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp env.example .env.local
+```
+
+#### **Environment Configuration**
+
+Add your OpenAI configuration to `.env.local`:
+
+```env
+# OpenAI API Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+
+# Realtime API Endpoints
+OPENAI_REALTIME_SESSION_URL=https://api.openai.com/v1/realtime/sessions
+NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL=https://api.openai.com/v1/realtime
+
+# Model Configuration
+NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
+```
+
+**Environment Variables Explained:**
+
+- **`OPENAI_API_KEY`** - Your OpenAI API key for session creation
+- **`OPENAI_API_BASE_URL`** - Base URL for all OpenAI API calls (optional, defaults to production)
+- **`OPENAI_REALTIME_SESSION_URL`** - Session creation endpoint (server-side)
+- **`NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL`** - WebRTC connection endpoint (client-side)
+- **`NEXT_PUBLIC_OPENAI_MODEL`** - Default model for the demo application
+
+**Note:** Variables prefixed with `NEXT_PUBLIC_` are exposed to the client-side code.
+
+#### **Running the Demo**
+
+```bash
+# Start the development server
+npm run dev
+
+# Open http://localhost:3000
+```
 
 ### 🧠 Architecture
 
@@ -149,6 +208,7 @@ const { onRawEvent } = useRealtimeClient({
 - Next.js 15 server actions for session creation
 - Calls OpenAI API with session configuration
 - Returns client secret for WebRTC authentication
+- Uses `OPENAI_REALTIME_SESSION_URL` environment variable
 
 **2. RealtimeClient (`src/lib/openai-realtime/client/RealtimeClient.ts`)**
 
@@ -216,7 +276,7 @@ function MyComponent() {
     connected,
   } = useRealtimeClient({
     clientSecret: 'your-client-secret',
-    realtimeUrl: 'https://api.openai.com/v1/realtime',
+    realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
     onMessageToken: (token) => console.log('AI:', token),
     onTranscript: (text) => console.log('You said:', text),
   });
@@ -244,7 +304,7 @@ function MyComponent() {
 const { connect, sendTextMessage, requestResponse, conversationItems } =
   useRealtimeClient({
     clientSecret: 'your-secret',
-    realtimeUrl: 'https://api.openai.com/v1/realtime',
+    realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
 
     // High-level callbacks
     onConversationItemCreated: (item) => {
@@ -270,6 +330,25 @@ const { connect, sendTextMessage, requestResponse, conversationItems } =
       console.log('Raw event:', event.type, event);
     },
   });
+```
+
+#### **Direct Client Usage (Without Hook)**
+
+```typescript
+import { RealtimeClient } from '@/lib/openai-realtime/client/RealtimeClient';
+
+const client = new RealtimeClient({
+  clientSecret: 'your-client-secret',
+  model: process.env.NEXT_PUBLIC_OPENAI_MODEL,
+  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
+  onMessageToken: (token) => console.log('AI:', token),
+  onError: (error) => console.error('Error:', error),
+});
+
+// Connect and start conversation
+await client.connect();
+await client.sendTextMessage('Hello!');
+await client.requestResponse();
 ```
 
 #### **Error Handling**
@@ -313,6 +392,49 @@ npm run dev
 ```
 
 See [DEMO_README.md](./DEMO_README.md) for detailed demo documentation.
+
+### 🔧 Configuration Options
+
+#### **Environment-Specific Setup**
+
+**Development:**
+```env
+OPENAI_API_KEY=your_dev_key
+NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
+```
+
+**Production:**
+```env
+OPENAI_API_KEY=your_prod_key
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_REALTIME_SESSION_URL=https://api.openai.com/v1/realtime/sessions
+NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL=https://api.openai.com/v1/realtime
+NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
+```
+
+**Custom Endpoints:**
+```env
+# For custom OpenAI-compatible endpoints
+OPENAI_API_BASE_URL=https://your-custom-endpoint.com/v1
+OPENAI_REALTIME_SESSION_URL=https://your-custom-endpoint.com/v1/realtime/sessions
+NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL=https://your-custom-endpoint.com/v1/realtime
+```
+
+#### **Session Configuration**
+
+```typescript
+const sessionConfig = {
+  model: process.env.NEXT_PUBLIC_OPENAI_MODEL,
+  voice: 'echo', // or 'alloy', 'fable', 'onyx', 'nova'
+  temperature: 0.8,
+  speed: 1.0,
+  instructions: 'You are a helpful AI assistant.',
+  modalities: ['audio', 'text'],
+  turn_detection: {
+    type: 'server_vad',
+  },
+};
+```
 
 ### ⏱️ In Progress
 

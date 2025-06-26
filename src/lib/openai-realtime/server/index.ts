@@ -5,7 +5,9 @@ export interface ServerRealtimeClientConfig {
 }
 
 export const defaultServerRealtimeClientConfig: ServerRealtimeClientConfig = {
-  baseUrl: 'https://api.openai.com/v1/realtime/sessions',
+  baseUrl:
+    process.env.OPENAI_REALTIME_SESSION_URL ||
+    'https://api.openai.com/v1/realtime/sessions',
 };
 
 export async function createSession(

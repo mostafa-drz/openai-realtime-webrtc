@@ -81,46 +81,48 @@ export function RealtimeDemo() {
     clientRef.current = new RealtimeClient({
       clientSecret,
       model: sessionConfig.model,
-      realtimeUrl: 'https://api.openai.com/v1/realtime',
-      onMessageToken: (token) => {
-        addEvent(ServerEventType.RESPONSE_TEXT_DELTA, { delta: token });
-      },
-      onTranscript: (transcript) => {
-        addEvent(ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA, {
-          delta: transcript,
-        });
-      },
-      onConnectionStateChange: (state) => {
-        setConnected(state === 'connected');
-        addEvent('connection_state_change', { state });
-      },
-      onError: (err) => {
-        setError(err);
-        addEvent(ServerEventType.ERROR, { error: err.message });
-      },
-      onConversationItemCreated: (item) => {
-        addEvent(ServerEventType.CONVERSATION_ITEM_CREATED, { item });
-      },
-      onResponseCreated: (response) => {
-        setIsResponding(true);
-        addEvent(ServerEventType.RESPONSE_CREATED, { response });
-      },
-      onResponseDone: (response) => {
-        setIsResponding(false);
-        addEvent(ServerEventType.RESPONSE_DONE, { response });
-      },
-      onSpeechStarted: () => {
-        addEvent(ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED, {});
-      },
-      onSpeechStopped: () => {
-        addEvent(ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED, {});
-      },
+      realtimeUrl:
+        process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL ||
+        'https://api.openai.com/v1/realtime',
+      // Raw event access for comprehensive logging and state management
       onRawEvent: (event: ServerEvent) => {
         addEvent(event.type, {
           event_id: event.event_id,
           data: event,
         });
+
+        // Manage state based on event types
+        switch (event.type) {
+          case ServerEventType.SESSION_CREATED:
+            // Session created successfully
+            break;
+          case ServerEventType.RESPONSE_CREATED:
+            setIsResponding(true);
+            break;
+          case ServerEventType.RESPONSE_DONE:
+            setIsResponding(false);
+            break;
+          case ServerEventType.ERROR:
+            setError(new Error(event.error?.message || 'Unknown error'));
+            break;
+        }
       },
+      // Connection state management
+      onConnectionStateChange: (state) => {
+        setConnected(state === 'connected');
+        addEvent('connection_state_change', { state });
+      },
+      // Error handling
+      onError: (err) => {
+        setError(err);
+        addEvent(ServerEventType.ERROR, { error: err.message });
+      },
+      // Placeholder callbacks for future use:
+      // onMessageToken: (token) => { /* Handle text tokens */ },
+      // onTranscript: (transcript) => { /* Handle speech transcript */ },
+      // onConversationItemCreated: (item) => { /* Handle new conversation items */ },
+      // onSpeechStarted: () => { /* Handle speech detection start */ },
+      // onSpeechStopped: () => { /* Handle speech detection end */ },
     });
 
     // Auto-connect
@@ -150,6 +152,7 @@ export function RealtimeDemo() {
   const handleCreateSession = async () => {
     try {
       setIsCreatingSession(true);
+      setError(null); // Clear any previous errors
       addEvent('session_creating', { config: sessionConfig });
 
       const result = await createRealtimeSession(sessionConfig);
@@ -162,12 +165,14 @@ export function RealtimeDemo() {
           config: result.config,
         });
       } else {
+        setError(new Error(result.error || 'Failed to create session'));
         addEvent(ServerEventType.ERROR, {
           error: result.error || 'Failed to create session',
         });
       }
     } catch (err) {
       console.error('Session creation error:', err);
+      setError(err instanceof Error ? err : new Error(String(err)));
       addEvent(ServerEventType.ERROR, {
         error: err instanceof Error ? err.message : 'Unknown error',
       });
