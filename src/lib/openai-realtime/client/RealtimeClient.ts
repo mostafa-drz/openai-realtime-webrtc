@@ -1,6 +1,6 @@
 import { ClientEventType } from '../types/client-events';
 import { SessionConfig, ConnectionState } from '../types/core';
-import { ServerEventType } from '../types/server-events';
+import { ServerEvent, ServerEventType } from '../types/server-events';
 
 export interface RealtimeClientConfig {
   clientSecret: string;
@@ -32,20 +32,20 @@ export class RealtimeClient {
     this.config.onConnectionStateChange?.(state);
   }
 
-  private handleServerEvent(event: any) {
+  private handleServerEvent(event: ServerEvent) {
     switch (event.type) {
       case ServerEventType.RESPONSE_TEXT_DELTA: {
-        const token = event.delta?.value || '';
+        const token = event?.delta || '';
         this.config.onMessageToken?.(token);
         break;
       }
       case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA: {
-        const transcript = event.delta?.value || '';
+        const transcript = event?.delta || '';
         this.config.onTranscript?.(transcript);
         break;
       }
       case ServerEventType.ERROR: {
-        const error = new Error(event.message || 'Unknown server error');
+        const error = new Error(event?.error.message || 'Unknown server error');
         this.config.onError?.(error);
         break;
       }
