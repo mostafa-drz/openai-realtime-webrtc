@@ -39,6 +39,8 @@ export interface ConversationState {
   items: Item[];
   currentResponseId?: string;
   isResponding: boolean;
+  isSpeaking: boolean;
+  hasAudioBuffer: boolean;
 }
 
 export type SessionType = 'regular' | 'transcription';
@@ -57,6 +59,8 @@ export class RealtimeClient {
     items: [],
     currentResponseId: undefined,
     isResponding: false,
+    isSpeaking: false,
+    hasAudioBuffer: false,
   };
 
   constructor(config: RealtimeClientConfig) {
@@ -107,11 +111,17 @@ export class RealtimeClient {
         break;
       }
       case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED: {
+        this.conversationState.isSpeaking = true;
         this.config.onSpeechStarted?.();
         break;
       }
       case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED: {
+        this.conversationState.isSpeaking = false;
         this.config.onSpeechStopped?.();
+        break;
+      }
+      case ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED: {
+        this.conversationState.hasAudioBuffer = false;
         break;
       }
       case ServerEventType.CONVERSATION_ITEM_CREATED: {
@@ -411,5 +421,87 @@ export class RealtimeClient {
 
   isResponding(): boolean {
     return this.conversationState.isResponding;
+  }
+
+  // Audio Buffer Management
+  async appendAudioData(audioBase64: string): Promise<void> {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.INPUT_AUDIO_BUFFER_APPEND,
+      audio: audioBase64,
+    };
+    this.sendEvent(event);
+    this.conversationState.hasAudioBuffer = true;
+  }
+
+  // Enhanced Conversation Management
+  async retrieveConversationItem(itemId: string): Promise<void> {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.CONVERSATION_ITEM_RETRIEVE,
+      item_id: itemId,
+    };
+    this.sendEvent(event);
+  }
+
+  async truncateConversationItem(audioEndMs: number): Promise<void> {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.CONVERSATION_ITEM_TRUNCATE,
+      audio_end_ms: audioEndMs,
+    };
+    this.sendEvent(event);
+  }
+
+  async deleteConversationItem(): Promise<void> {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.CONVERSATION_ITEM_DELETE,
+    };
+    this.sendEvent(event);
+  }
+
+  // Enhanced Response Management
+  async cancelSpecificResponse(
+    responseId: string,
+    reason?: string
+  ): Promise<void> {
+    if (this.sessionType === 'transcription') {
+      throw new Error(
+        'AI responses are not supported in transcription sessions'
+      );
+    }
+
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.RESPONSE_CANCEL,
+      response_id: responseId,
+      reason: reason || 'User cancelled',
+    };
+    this.sendEvent(event);
+  }
+
+  // Enhanced State Getters
+  isSpeaking(): boolean {
+    return this.conversationState.isSpeaking;
+  }
+
+  hasAudioBuffer(): boolean {
+    return this.conversationState.hasAudioBuffer;
   }
 }

@@ -332,6 +332,53 @@ const { connect, sendTextMessage, requestResponse, conversationItems } =
   });
 ```
 
+#### **Enhanced Audio and Conversation Management**
+
+```typescript
+const {
+  // Audio buffer management
+  appendAudioData,
+  commitAudioBuffer,
+  clearAudioBuffer,
+  
+  // Conversation management
+  retrieveConversationItem,
+  truncateConversationItem,
+  deleteConversationItem,
+  
+  // Enhanced response management
+  cancelSpecificResponse,
+  
+  // State tracking
+  isSpeaking,
+  hasAudioBuffer,
+  isResponding,
+} = useRealtimeClient({
+  clientSecret: 'your-secret',
+  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
+});
+
+// Manual audio buffer management
+await appendAudioData(base64AudioData);
+await commitAudioBuffer();
+
+// Conversation editing
+await retrieveConversationItem('item_123');
+await truncateConversationItem(5000); // Truncate at 5 seconds
+await deleteConversationItem();
+
+// Cancel specific response
+await cancelSpecificResponse('response_456', 'User interrupted');
+
+// Check states
+if (isSpeaking) {
+  console.log('User is currently speaking');
+}
+if (hasAudioBuffer) {
+  console.log('Audio buffer has data');
+}
+```
+
 #### **Direct Client Usage (Without Hook)**
 
 ```typescript

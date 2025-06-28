@@ -33,6 +33,8 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
       items: [],
       currentResponseId: undefined,
       isResponding: false,
+      isSpeaking: false,
+      hasAudioBuffer: false,
     }
   );
 
@@ -80,9 +82,17 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
           config.onResponseDone?.(response);
         },
         onSpeechStarted: () => {
+          setConversationState((prev) => ({
+            ...prev,
+            isSpeaking: true,
+          }));
           config.onSpeechStarted?.();
         },
         onSpeechStopped: () => {
+          setConversationState((prev) => ({
+            ...prev,
+            isSpeaking: false,
+          }));
           config.onSpeechStopped?.();
         },
         onRawEvent: (event) => {
@@ -245,6 +255,63 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
     await clientRef.current.clearOutputAudioBuffer();
   }, []);
 
+  const appendAudioData = useCallback(async (audioBase64: string) => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
+    await clientRef.current.appendAudioData(audioBase64);
+    setConversationState((prev) => ({
+      ...prev,
+      hasAudioBuffer: true,
+    }));
+  }, []);
+
+  const retrieveConversationItem = useCallback(async (itemId: string) => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
+    await clientRef.current.retrieveConversationItem(itemId);
+  }, []);
+
+  const truncateConversationItem = useCallback(async (audioEndMs: number) => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
+    await clientRef.current.truncateConversationItem(audioEndMs);
+  }, []);
+
+  const deleteConversationItem = useCallback(async () => {
+    if (!clientRef.current) {
+      throw new Error(
+        'No client available. Please ensure clientSecret is provided.'
+      );
+    }
+
+    await clientRef.current.deleteConversationItem();
+  }, []);
+
+  const cancelSpecificResponse = useCallback(
+    async (responseId: string, reason?: string) => {
+      if (!clientRef.current) {
+        throw new Error(
+          'No client available. Please ensure clientSecret is provided.'
+        );
+      }
+
+      await clientRef.current.cancelSpecificResponse(responseId, reason);
+    },
+    []
+  );
+
   return {
     client: clientRef.current,
     connect,
@@ -255,6 +322,11 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
     sendTextMessage,
     requestResponse,
     cancelResponse,
+    cancelSpecificResponse,
+    appendAudioData,
+    retrieveConversationItem,
+    truncateConversationItem,
+    deleteConversationItem,
     commitAudioBuffer,
     clearAudioBuffer,
     clearOutputAudioBuffer,
@@ -264,6 +336,8 @@ export function useRealtimeClient(config: UseRealtimeClientConfig) {
     conversationState,
     conversationItems: conversationState.items,
     isResponding: conversationState.isResponding,
+    isSpeaking: conversationState.isSpeaking,
+    hasAudioBuffer: conversationState.hasAudioBuffer,
     currentResponseId: conversationState.currentResponseId,
     hasClient: !!clientRef.current,
   };
