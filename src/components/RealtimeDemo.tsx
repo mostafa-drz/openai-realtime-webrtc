@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { RealtimeClient } from '@/lib/openai-realtime/client/RealtimeClient';
 import {
   SessionConfig,
+  TranscriptionSessionConfig,
   Voice,
   Modality,
   TurnDetectionType,
@@ -12,14 +13,19 @@ import {
   TranscriptionModel,
   Item,
   ContentType,
+  AudioFormat,
 } from '@/lib/openai-realtime/types';
-import { createRealtimeSession } from '@/lib/actions';
+import {
+  createRealtimeSession,
+  createRealtimeTranscriptionSession,
+} from '@/lib/actions';
 import { ConversationPanel } from '@/components/ConversationPanel';
+import { TranscriptionPanel } from '@/components/TranscriptionPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { EventLog } from '@/components/EventLog';
 import { StatusBar } from '@/components/StatusBar';
 
-// Default session configuration
+// Default session configuration for regular sessions
 const defaultSessionConfig: SessionConfig = {
   model: process.env.NEXT_PUBLIC_OPENAI_MODEL,
   voice: Voice.ECHO,
@@ -36,6 +42,18 @@ const defaultSessionConfig: SessionConfig = {
     model: TranscriptionModel.GPT4O_TRANSCRIBE,
     language: 'en',
   },
+};
+
+// Default configuration for transcription sessions
+const defaultTranscriptionConfig: TranscriptionSessionConfig = {
+  turn_detection: {
+    type: TurnDetectionType.SERVER_VAD,
+  },
+  input_audio_transcription: {
+    model: TranscriptionModel.GPT4O_TRANSCRIBE,
+    language: 'en',
+  },
+  input_audio_format: AudioFormat.PCM16,
 };
 
 interface EventLogItem {
@@ -74,6 +92,8 @@ function isTextContent(
 export function RealtimeDemo() {
   const [sessionConfig, setSessionConfig] =
     useState<SessionConfig>(defaultSessionConfig);
+  const [transcriptionConfig, setTranscriptionConfig] =
+    useState<TranscriptionSessionConfig>(defaultTranscriptionConfig);
   const [clientSecret, setClientSecret] = useState<string>('');
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [events, setEvents] = useState<EventLogItem[]>([]);
@@ -82,6 +102,9 @@ export function RealtimeDemo() {
   const [isResponding, setIsResponding] = useState(false);
   const [conversationItems, setConversationItems] = useState<Item[]>([]);
   const [micActive, setMicActive] = useState(false);
+  const [sessionType, setSessionType] = useState<'regular' | 'transcription'>(
+    'regular'
+  );
 
   const clientRef = useRef<RealtimeClient | null>(null);
 
@@ -121,6 +144,7 @@ export function RealtimeDemo() {
       realtimeUrl:
         process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL ||
         'https://api.openai.com/v1/realtime',
+      sessionType,
       // Event log for debugging
       onRawEvent: (event: ServerEvent) => {
         addEvent(event.type, {
@@ -257,7 +281,7 @@ export function RealtimeDemo() {
       }
     };
     connectClient();
-  }, [clientSecret, sessionConfig.model, addEvent]);
+  }, [clientSecret, sessionConfig.model, addEvent, sessionType]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -273,15 +297,29 @@ export function RealtimeDemo() {
     try {
       setIsCreatingSession(true);
       setError(null); // Clear any previous errors
-      addEvent('session_creating', { config: sessionConfig });
 
-      const result = await createRealtimeSession(sessionConfig);
+      let result;
+
+      if (sessionType === 'regular') {
+        addEvent('session_creating', {
+          config: sessionConfig,
+          type: 'regular',
+        });
+        result = await createRealtimeSession(sessionConfig);
+      } else {
+        addEvent('session_creating', {
+          config: transcriptionConfig,
+          type: 'transcription',
+        });
+        result = await createRealtimeTranscriptionSession(transcriptionConfig);
+      }
 
       if (result.success && result.clientSecret) {
         setClientSecret(result.clientSecret);
         addEvent(ServerEventType.SESSION_CREATED, {
           sessionId: result.sessionId,
           config: result.config,
+          sessionType,
         });
 
         // Automatically start recording after successful session creation
@@ -313,18 +351,39 @@ export function RealtimeDemo() {
   };
 
   // Handle session update
-  const handleUpdateSession = (newConfig: Partial<SessionConfig>) => {
+  const handleUpdateSession = (
+    newConfig: Partial<SessionConfig> | Partial<TranscriptionSessionConfig>
+  ) => {
     try {
-      // Always update local config state
-      setSessionConfig((prev) => ({ ...prev, ...newConfig }));
+      // Always update local config state based on session type
+      if (sessionType === 'regular') {
+        setSessionConfig((prev) => ({
+          ...prev,
+          ...(newConfig as Partial<SessionConfig>),
+        }));
+      } else {
+        setTranscriptionConfig((prev) => ({
+          ...prev,
+          ...(newConfig as Partial<TranscriptionSessionConfig>),
+        }));
+      }
 
       // Only send update to server if connected
       if (clientRef.current && connected) {
-        clientRef.current.updateSession(newConfig);
-        addEvent(ServerEventType.SESSION_UPDATED, { config: newConfig });
+        if (sessionType === 'regular') {
+          clientRef.current.updateSession(newConfig as Partial<SessionConfig>);
+        } else {
+          clientRef.current.updateTranscriptionSession(
+            newConfig as Partial<TranscriptionSessionConfig>
+          );
+        }
+        addEvent(ServerEventType.SESSION_UPDATED, {
+          config: newConfig,
+          sessionType,
+        });
       } else {
         // Log config change when not connected (pre-session configuration)
-        addEvent('config_updated', { config: newConfig });
+        addEvent('config_updated', { config: newConfig, sessionType });
       }
     } catch (err) {
       addEvent(ServerEventType.ERROR, {
@@ -336,6 +395,15 @@ export function RealtimeDemo() {
   // Handle text message sending
   const handleSendTextMessage = async (text: string) => {
     if (!clientRef.current || !connected || !text.trim()) return;
+
+    // Don't send text messages for transcription sessions
+    if (sessionType === 'transcription') {
+      addEvent('text_message_blocked', {
+        reason: 'Text messages not supported in transcription sessions',
+        text,
+      });
+      return;
+    }
 
     try {
       await clientRef.current.sendTextMessage(text);
@@ -370,8 +438,12 @@ export function RealtimeDemo() {
         micEnabled={micActive}
         error={error}
         isResponding={isResponding}
-        conversationItemCount={0} // TODO: Add conversation item tracking
-        transcriptionEnabled={sessionConfig.input_audio_transcription !== null}
+        conversationItemCount={conversationItems.length}
+        transcriptionEnabled={
+          sessionType === 'regular'
+            ? sessionConfig.input_audio_transcription !== null
+            : transcriptionConfig.input_audio_transcription !== null
+        }
         onDisconnect={handleDisconnect}
       />
 
@@ -382,6 +454,23 @@ export function RealtimeDemo() {
         </h2>
 
         <div className="space-y-4">
+          {/* Session Type Selector */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Session Type
+            </label>
+            <select
+              value={sessionType}
+              onChange={(e) =>
+                setSessionType(e.target.value as 'regular' | 'transcription')
+              }
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 mb-3"
+              disabled={connected}
+            >
+              <option value="regular">Regular Chat Session</option>
+              <option value="transcription">Transcription Session</option>
+            </select>
+          </div>
           {/* Session Creation */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -429,9 +518,14 @@ export function RealtimeDemo() {
             {settingsOpen && (
               <div id="session-settings-panel" className="mt-4">
                 <SettingsPanel
-                  config={sessionConfig}
+                  config={
+                    sessionType === 'regular'
+                      ? sessionConfig
+                      : transcriptionConfig
+                  }
                   onConfigChange={handleUpdateSession}
                   disabled={connected}
+                  sessionType={sessionType}
                 />
               </div>
             )}
@@ -439,16 +533,21 @@ export function RealtimeDemo() {
         </div>
       </div>
 
-      {/* 3. Conversation Panel */}
+      {/* 3. Conversation Panel or Transcription Panel */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
-        <ConversationPanel
-          connected={connected}
-          events={events}
-          conversationItems={conversationItems}
-          isResponding={isResponding}
-          modalities={sessionConfig.modalities}
-          onSendTextMessage={handleSendTextMessage}
-        />
+        {sessionType === 'regular' ? (
+          <ConversationPanel
+            connected={connected}
+            events={events}
+            conversationItems={conversationItems}
+            isResponding={isResponding}
+            modalities={sessionConfig.modalities}
+            onSendTextMessage={handleSendTextMessage}
+            sessionType={sessionType}
+          />
+        ) : (
+          <TranscriptionPanel connected={connected} events={events} />
+        )}
       </div>
 
       {/* 4. Event Log */}

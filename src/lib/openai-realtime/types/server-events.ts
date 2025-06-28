@@ -14,8 +14,7 @@ import {
   ResponseContentPart,
   BaseResponseEvent,
   BaseDeltaEvent,
-  TranscriptionSessionConfig,
-  ObjectType,
+  TranscriptionSessionResponse,
   RateLimit,
 } from './core';
 
@@ -112,7 +111,7 @@ export interface SessionCreatedEvent {
   /** Optional event ID for tracking */
   event_id: EventId;
   type: ServerEventType.SESSION_CREATED;
-  session: SessionResponse;
+  session: SessionResponse | TranscriptionSessionResponse;
 }
 
 /**
@@ -133,12 +132,7 @@ export interface TranscriptionSessionUpdatedEvent {
   event_id: EventId;
   type: ServerEventType.TRANSCRIPTION_SESSION_UPDATED;
   /** A new Realtime transcription session configuration */
-  session: TranscriptionSessionConfig & {
-    /** Unique ID of the session */
-    id: string;
-    /** Object type */
-    object: ObjectType.TRANSCRIPTION_SESSION;
-  };
+  session: TranscriptionSessionResponse;
 }
 
 /**

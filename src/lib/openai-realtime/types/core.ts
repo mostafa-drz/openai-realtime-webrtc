@@ -196,13 +196,22 @@ export interface SessionConfig extends BaseSessionConfig {
 
 /**
  * Configuration for a transcription session
- * Extends base session config with transcription-specific settings
+ * Only includes fields supported by the OpenAI transcription session API
+ * Transcription sessions are purely for audio-to-text conversion, no AI responses
  */
-export interface TranscriptionSessionConfig extends BaseSessionConfig {
-  /** Additional fields to include in the response */
-  include?: string[];
+export interface TranscriptionSessionConfig {
+  /** Configuration for client secret expiration */
+  client_secret?: ClientSecretConfig;
+  /** Audio format for input, defaults to PCM16 */
+  input_audio_format?: AudioFormat;
+  /** Configuration for noise reduction, can be disabled with null */
+  input_audio_noise_reduction?: NoiseReductionConfig | null;
   /** Required configuration for audio transcription */
   input_audio_transcription: TranscriptionConfig;
+  /** Configuration for turn detection */
+  turn_detection?: TurnDetectionConfig;
+  /** Additional fields to include in the response */
+  include?: string[];
 }
 
 /**
@@ -254,10 +263,37 @@ export interface CreateSessionResponse extends BaseSessionResponse {
 
 /**
  * Response from creating a transcription session
+ * Transcription sessions have a different structure than regular sessions
  */
-export interface CreateTranscriptionSessionResponse
-  extends BaseSessionResponse {
+export interface CreateTranscriptionSessionResponse {
+  /** Unique ID of the session */
+  id: string;
+  /** Object type */
   object: ObjectType.TRANSCRIPTION_SESSION;
+  /** Configuration for turn detection */
+  turn_detection: TurnDetectionConfig;
+  /** Audio format for input */
+  input_audio_format: AudioFormat;
+  /** Configuration for audio transcription */
+  input_audio_transcription: TranscriptionConfig;
+  /** Client secret for authentication */
+  client_secret: ClientSecret;
+}
+
+/**
+ * Transcription session response type for events
+ */
+export interface TranscriptionSessionResponse {
+  /** Unique ID of the session */
+  id: string;
+  /** Object type */
+  object: ObjectType.TRANSCRIPTION_SESSION;
+  /** Configuration for turn detection */
+  turn_detection: TurnDetectionConfig;
+  /** Audio format for input */
+  input_audio_format: AudioFormat;
+  /** Configuration for audio transcription */
+  input_audio_transcription: TranscriptionConfig;
 }
 
 // Object Types

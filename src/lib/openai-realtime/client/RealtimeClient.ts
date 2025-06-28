@@ -1,6 +1,7 @@
 import { ClientEventType } from '../types/client-events';
 import {
   SessionConfig,
+  TranscriptionSessionConfig,
   ConnectionState,
   Item,
   ResponseConfig,
@@ -8,6 +9,7 @@ import {
   ContentType,
   MessageRole,
   Response,
+  ObjectType,
 } from '../types/core';
 import { ServerEvent, ServerEventType } from '../types/server-events';
 
@@ -16,6 +18,7 @@ export interface RealtimeClientConfig {
   model?: string;
   realtimeUrl: string;
   dataChannelLabel?: string;
+  sessionType?: SessionType;
   onMessageToken?: (token: string) => void;
   onTranscript?: (text: string) => void;
   onConnectionStateChange?: (
@@ -38,11 +41,14 @@ export interface ConversationState {
   isResponding: boolean;
 }
 
+export type SessionType = 'regular' | 'transcription';
+
 export class RealtimeClient {
   private config: RealtimeClientConfig;
   private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
   private micActive: boolean = false;
   private sessionId?: string;
+  private sessionType: SessionType;
   private pc?: RTCPeerConnection;
   private dataChannel?: RTCDataChannel;
 
@@ -55,6 +61,7 @@ export class RealtimeClient {
 
   constructor(config: RealtimeClientConfig) {
     this.config = config;
+    this.sessionType = config.sessionType || 'regular';
   }
 
   private updateState(state: ConnectionState) {
@@ -76,6 +83,17 @@ export class RealtimeClient {
     switch (event.type) {
       case ServerEventType.SESSION_CREATED: {
         this.sessionId = event.session.id;
+        // Detect session type based on object type
+        // Use type assertion since the API supports both session types
+        const sessionObject = (event.session as { object: string }).object;
+        this.sessionType =
+          sessionObject === ObjectType.TRANSCRIPTION_SESSION
+            ? 'transcription'
+            : 'regular';
+        break;
+      }
+      case ServerEventType.TRANSCRIPTION_SESSION_UPDATED: {
+        this.sessionType = 'transcription';
         break;
       }
       case ServerEventType.RESPONSE_TEXT_DELTA: {
@@ -169,7 +187,11 @@ export class RealtimeClient {
       await this.pc.setLocalDescription(offer);
 
       const url = new URL(this.config.realtimeUrl);
-      url.searchParams.set('model', this.config.model || '');
+
+      // Only set model parameter for regular sessions, not transcription sessions
+      if (this.sessionType === 'regular' && this.config.model) {
+        url.searchParams.set('model', this.config.model);
+      }
 
       const resp = await fetch(url.toString(), {
         method: 'POST',
@@ -237,6 +259,20 @@ export class RealtimeClient {
     this.dataChannel.send(JSON.stringify(event));
   }
 
+  updateTranscriptionSession(
+    config: Partial<TranscriptionSessionConfig>
+  ): void {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Data channel is not open.');
+    }
+
+    const event = {
+      type: ClientEventType.TRANSCRIPTION_SESSION_UPDATE,
+      session: config,
+    };
+    this.dataChannel.send(JSON.stringify(event));
+  }
+
   async disconnect(): Promise<void> {
     try {
       this.pc?.getSenders().forEach((sender) => {
@@ -271,6 +307,7 @@ export class RealtimeClient {
       connection: this.connectionState,
       isMicStreaming: this.micActive,
       sessionId: this.sessionId,
+      sessionType: this.sessionType,
     };
   }
 
@@ -279,6 +316,12 @@ export class RealtimeClient {
     text: string,
     role: MessageRole = MessageRole.USER
   ): Promise<void> {
+    if (this.sessionType === 'transcription') {
+      throw new Error(
+        'Text messages are not supported in transcription sessions'
+      );
+    }
+
     const item = {
       id: `item_${Date.now()}`,
       type: ItemType.MESSAGE,
@@ -300,6 +343,12 @@ export class RealtimeClient {
   }
 
   async requestResponse(options?: Partial<ResponseConfig>): Promise<void> {
+    if (this.sessionType === 'transcription') {
+      throw new Error(
+        'AI responses are not supported in transcription sessions'
+      );
+    }
+
     const responseConfig: ResponseConfig = {
       ...options,
     };
@@ -313,6 +362,12 @@ export class RealtimeClient {
   }
 
   async cancelResponse(reason?: string): Promise<void> {
+    if (this.sessionType === 'transcription') {
+      throw new Error(
+        'AI responses are not supported in transcription sessions'
+      );
+    }
+
     const event = {
       type: ClientEventType.RESPONSE_CANCEL,
       reason: reason || 'User cancelled',

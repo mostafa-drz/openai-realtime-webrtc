@@ -17,6 +17,7 @@ interface ConversationPanelProps {
   isResponding: boolean;
   modalities?: string[];
   onSendTextMessage: (text: string) => void;
+  sessionType: string;
 }
 
 export function ConversationPanel({
@@ -26,6 +27,7 @@ export function ConversationPanel({
   isResponding,
   modalities = ['audio', 'text'],
   onSendTextMessage,
+  sessionType,
 }: ConversationPanelProps) {
   const [textInput, setTextInput] = useState('');
   const conversationEndRef = useRef<HTMLDivElement>(null);
@@ -306,31 +308,33 @@ export function ConversationPanel({
         </div>
 
         {/* Text Input - Fixed at bottom */}
-        {connected && modalities.includes('text') && (
-          <div className="space-y-2 mt-4 flex-shrink-0">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Send Text Message
-            </label>
-            <div className="flex gap-2">
-              <textarea
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                disabled={isResponding}
-                className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                rows={2}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!textInput.trim() || isResponding}
-                className="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium self-end"
-              >
-                Send
-              </button>
+        {connected &&
+          modalities.includes('text') &&
+          sessionType !== 'transcription' && (
+            <div className="space-y-2 mt-4 flex-shrink-0">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Send Text Message
+              </label>
+              <div className="flex gap-2">
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your message..."
+                  disabled={isResponding}
+                  className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                  rows={2}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!textInput.trim() || isResponding}
+                  className="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium self-end"
+                >
+                  Send
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Event Counter */}
         <div className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4 flex-shrink-0">

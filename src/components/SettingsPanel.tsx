@@ -2,6 +2,7 @@
 
 import {
   SessionConfig,
+  TranscriptionSessionConfig,
   Voice,
   AudioFormat,
   Modality,
@@ -11,9 +12,12 @@ import {
 } from '@/lib/openai-realtime/types';
 
 interface SettingsPanelProps {
-  config: SessionConfig;
-  onConfigChange: (config: Partial<SessionConfig>) => void;
+  config: SessionConfig | TranscriptionSessionConfig;
+  onConfigChange: (
+    config: Partial<SessionConfig> | Partial<TranscriptionSessionConfig>
+  ) => void;
   disabled: boolean;
+  sessionType: 'regular' | 'transcription';
 }
 
 const VOICE_OPTIONS = [
@@ -72,7 +76,15 @@ export function SettingsPanel({
   config,
   onConfigChange,
   disabled,
+  sessionType,
 }: SettingsPanelProps) {
+  // Type guards to check session type
+  const isRegularSession = (
+    config: SessionConfig | TranscriptionSessionConfig
+  ): config is SessionConfig => {
+    return sessionType === 'regular';
+  };
+
   // Helper function to handle transcription toggle
   const handleTranscriptionToggle = (enabled: boolean) => {
     if (enabled) {
@@ -106,7 +118,9 @@ export function SettingsPanel({
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
       <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-        Session Settings
+        {sessionType === 'regular'
+          ? 'Chat Session Settings'
+          : 'Transcription Session Settings'}
       </h3>
 
       <div className="space-y-4">
@@ -234,134 +248,145 @@ export function SettingsPanel({
           )}
         </div>
 
-        {/* Modality Selection */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Modalities
-          </label>
-          <select
-            value={JSON.stringify(config.modalities)}
-            onChange={(e) =>
-              onConfigChange({ modalities: JSON.parse(e.target.value) })
-            }
-            disabled={disabled}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {MODALITY_OPTIONS.map((option) => (
-              <option key={option.label} value={JSON.stringify(option.value)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Choose whether to enable audio, text, or both modalities
-          </p>
-        </div>
-
-        {/* Voice Selection */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Voice
-          </label>
-          <select
-            value={config.voice}
-            onChange={(e) => onConfigChange({ voice: e.target.value as Voice })}
-            disabled={disabled}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {VOICE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Audio Format */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Audio Format
-          </label>
-          <select
-            value={config.output_audio_format}
-            onChange={(e) =>
-              onConfigChange({
-                output_audio_format: e.target.value as AudioFormat,
-              })
-            }
-            disabled={disabled}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {AUDIO_FORMAT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Temperature */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Temperature: {config.temperature}
-          </label>
-          <input
-            type="range"
-            min="0.6"
-            max="1.2"
-            step="0.1"
-            value={config.temperature}
-            onChange={(e) =>
-              onConfigChange({ temperature: parseFloat(e.target.value) })
-            }
-            disabled={disabled}
-            className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
-          />
-          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-            <span>Creative (0.6)</span>
-            <span>Balanced (0.8)</span>
-            <span>Focused (1.2)</span>
+        {/* Modality Selection - Only for regular sessions */}
+        {isRegularSession(config) && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Modalities
+            </label>
+            <select
+              value={JSON.stringify(config.modalities)}
+              onChange={(e) =>
+                onConfigChange({ modalities: JSON.parse(e.target.value) })
+              }
+              disabled={disabled}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {MODALITY_OPTIONS.map((option) => (
+                <option key={option.label} value={JSON.stringify(option.value)}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Choose whether to enable audio, text, or both modalities
+            </p>
           </div>
-        </div>
+        )}
 
-        {/* Speed */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Speed: {config.speed}x
-          </label>
-          <input
-            type="range"
-            min="0.25"
-            max="1.5"
-            step="0.25"
-            value={config.speed}
-            onChange={(e) =>
-              onConfigChange({ speed: parseFloat(e.target.value) })
-            }
-            disabled={disabled}
-            className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
-          />
-          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-            <span>Slow (0.25x)</span>
-            <span>Normal (1.0x)</span>
-            <span>Fast (1.5x)</span>
-          </div>
-        </div>
+        {/* Regular Session Only Settings */}
+        {isRegularSession(config) && (
+          <>
+            {/* Voice Selection */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Voice
+              </label>
+              <select
+                value={config.voice}
+                onChange={(e) =>
+                  onConfigChange({ voice: e.target.value as Voice })
+                }
+                disabled={disabled}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {VOICE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Instructions */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Instructions
-          </label>
-          <textarea
-            value={config.instructions}
-            onChange={(e) => onConfigChange({ instructions: e.target.value })}
-            disabled={disabled}
-            rows={3}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
-            placeholder="Enter system instructions for the AI..."
-          />
-        </div>
+            {/* Audio Format */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Audio Format
+              </label>
+              <select
+                value={config.output_audio_format}
+                onChange={(e) =>
+                  onConfigChange({
+                    output_audio_format: e.target.value as AudioFormat,
+                  })
+                }
+                disabled={disabled}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {AUDIO_FORMAT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Temperature */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Temperature: {config.temperature}
+              </label>
+              <input
+                type="range"
+                min="0.6"
+                max="1.2"
+                step="0.1"
+                value={config.temperature}
+                onChange={(e) =>
+                  onConfigChange({ temperature: parseFloat(e.target.value) })
+                }
+                disabled={disabled}
+                className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+              />
+              <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <span>Creative (0.6)</span>
+                <span>Balanced (0.8)</span>
+                <span>Focused (1.2)</span>
+              </div>
+            </div>
+
+            {/* Speed */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Speed: {config.speed}x
+              </label>
+              <input
+                type="range"
+                min="0.25"
+                max="1.5"
+                step="0.25"
+                value={config.speed}
+                onChange={(e) =>
+                  onConfigChange({ speed: parseFloat(e.target.value) })
+                }
+                disabled={disabled}
+                className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+              />
+              <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <span>Slow (0.25x)</span>
+                <span>Normal (1.0x)</span>
+                <span>Fast (1.5x)</span>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Instructions
+              </label>
+              <textarea
+                value={config.instructions}
+                onChange={(e) =>
+                  onConfigChange({ instructions: e.target.value })
+                }
+                disabled={disabled}
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
+                placeholder="Enter system instructions for the AI..."
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
