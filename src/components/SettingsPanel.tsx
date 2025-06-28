@@ -124,6 +124,27 @@ export function SettingsPanel({
       </h3>
 
       <div className="space-y-4">
+        {/* Instructions - Moved to top for regular sessions */}
+        {isRegularSession(config) && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Bot Instructions
+            </label>
+            <textarea
+              value={config.instructions}
+              onChange={(e) => onConfigChange({ instructions: e.target.value })}
+              disabled={disabled}
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
+              placeholder="Define the AI assistant's role, personality, and behavior..."
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Set the AI&apos;s role and behavior. This acts as the system
+              prompt that guides all responses.
+            </p>
+          </div>
+        )}
+
         {/* VAD Type Selection */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -367,23 +388,6 @@ export function SettingsPanel({
                 <span>Normal (1.0x)</span>
                 <span>Fast (1.5x)</span>
               </div>
-            </div>
-
-            {/* Instructions */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Instructions
-              </label>
-              <textarea
-                value={config.instructions}
-                onChange={(e) =>
-                  onConfigChange({ instructions: e.target.value })
-                }
-                disabled={disabled}
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
-                placeholder="Enter system instructions for the AI..."
-              />
             </div>
           </>
         )}
