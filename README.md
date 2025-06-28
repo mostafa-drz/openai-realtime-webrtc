@@ -340,15 +340,15 @@ const {
   appendAudioData,
   commitAudioBuffer,
   clearAudioBuffer,
-  
+
   // Conversation management
   retrieveConversationItem,
   truncateConversationItem,
   deleteConversationItem,
-  
+
   // Enhanced response management
   cancelSpecificResponse,
-  
+
   // State tracking
   isSpeaking,
   hasAudioBuffer,
