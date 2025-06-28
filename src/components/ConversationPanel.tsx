@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Item, MessageRole, ContentType } from '@/lib/openai-realtime/types';
 
 interface EventLogItem {
@@ -28,6 +28,7 @@ export function ConversationPanel({
   onSendTextMessage,
 }: ConversationPanelProps) {
   const [textInput, setTextInput] = useState('');
+  const conversationEndRef = useRef<HTMLDivElement>(null);
 
   // Group events by conversation flow using real event types
   const conversationEvents = events.filter((event) =>
@@ -84,6 +85,16 @@ export function ConversationPanel({
       return eventData?.delta || '';
     })
     .join('');
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [
+    conversationItems,
+    currentInputTranscript,
+    currentResponseTranscript,
+    currentResponse,
+  ]);
 
   // Handle text message submission
   const handleSendMessage = () => {
@@ -159,14 +170,14 @@ export function ConversationPanel({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 h-[600px] flex flex-col">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex-shrink-0">
         Conversation
       </h3>
 
-      <div className="space-y-6">
-        {/* Conversation Flow */}
-        <div className="space-y-4">
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Conversation Flow - Scrollable Area */}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           {/* Conversation Items */}
           {conversationItems.length > 0 && (
             <div className="space-y-4">{renderConversationItems()}</div>
@@ -237,33 +248,6 @@ export function ConversationPanel({
             </div>
           )}
 
-          {/* Text Input */}
-          {connected && modalities.includes('text') && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Send Text Message
-              </label>
-              <div className="flex gap-2">
-                <textarea
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isResponding}
-                  className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                  rows={2}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!textInput.trim() || isResponding}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium self-end"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Empty State */}
           {!currentInputTranscript &&
             !currentResponseTranscript &&
@@ -316,10 +300,40 @@ export function ConversationPanel({
               <p className="text-sm">Create a session to start chatting</p>
             </div>
           )}
+
+          {/* Invisible div for auto-scrolling */}
+          <div ref={conversationEndRef} />
         </div>
 
+        {/* Text Input - Fixed at bottom */}
+        {connected && modalities.includes('text') && (
+          <div className="space-y-2 mt-4 flex-shrink-0">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Send Text Message
+            </label>
+            <div className="flex gap-2">
+              <textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isResponding}
+                className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                rows={2}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!textInput.trim() || isResponding}
+                className="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium self-end"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Event Counter */}
-        <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+        <div className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4 flex-shrink-0">
           {conversationEvents.length} events logged • {conversationItems.length}{' '}
           conversation items
         </div>

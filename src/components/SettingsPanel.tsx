@@ -7,6 +7,7 @@ import {
   Modality,
   TranscriptionModel,
   TranscriptionConfig,
+  TurnDetectionType,
 } from '@/lib/openai-realtime/types';
 
 interface SettingsPanelProps {
@@ -62,6 +63,11 @@ const LANGUAGE_OPTIONS = [
   { value: 'zh', label: 'Chinese' },
 ];
 
+const VAD_TYPE_OPTIONS = [
+  { value: TurnDetectionType.SERVER_VAD, label: 'Server VAD (default)' },
+  { value: TurnDetectionType.SEMANTIC_VAD, label: 'Semantic VAD' },
+];
+
 export function SettingsPanel({
   config,
   onConfigChange,
@@ -104,6 +110,35 @@ export function SettingsPanel({
       </h3>
 
       <div className="space-y-4">
+        {/* VAD Type Selection */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Voice Activity Detection (VAD) Type
+          </label>
+          <select
+            value={config.turn_detection?.type || TurnDetectionType.SERVER_VAD}
+            onChange={(e) =>
+              onConfigChange({
+                turn_detection: {
+                  ...config.turn_detection,
+                  type: e.target.value as TurnDetectionType,
+                },
+              })
+            }
+            disabled={disabled}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {VAD_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Choose how the system detects when you are speaking.
+          </p>
+        </div>
+
         {/* Transcription Settings */}
         <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">

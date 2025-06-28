@@ -81,6 +81,7 @@ export function RealtimeDemo() {
   const [error, setError] = useState<Error | null>(null);
   const [isResponding, setIsResponding] = useState(false);
   const [conversationItems, setConversationItems] = useState<Item[]>([]);
+  const [micActive, setMicActive] = useState(false);
 
   const clientRef = useRef<RealtimeClient | null>(null);
 
@@ -128,6 +129,14 @@ export function RealtimeDemo() {
         });
         // Only manage state here, not chat thread
         switch (event.type) {
+          case 'input_audio_buffer.speech_started':
+            setMicActive(true);
+            break;
+          case 'input_audio_buffer.speech_stopped':
+            setMicActive(false);
+            // Auto-commit audio for transcription
+            clientRef.current?.commitAudioBuffer();
+            break;
           case ServerEventType.SESSION_CREATED:
             break;
           case ServerEventType.RESPONSE_CREATED:
@@ -358,7 +367,7 @@ export function RealtimeDemo() {
       {/* 0. Status Bar */}
       <StatusBar
         connected={connected}
-        micEnabled={false} // TODO: Add mic state tracking
+        micEnabled={micActive}
         error={error}
         isResponding={isResponding}
         conversationItemCount={0} // TODO: Add conversation item tracking
