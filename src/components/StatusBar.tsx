@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
 interface StatusBarProps {
   connected: boolean;
   micEnabled: boolean;
@@ -19,6 +21,23 @@ export function StatusBar({
   transcriptionEnabled = false,
   onDisconnect,
 }: StatusBarProps) {
+  const [currentTime, setCurrentTime] = useState<string>('');
+
+  // Update time on client-side only to avoid hydration mismatch
+  useEffect(() => {
+    const updateTime = () => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    };
+
+    // Set initial time
+    updateTime();
+
+    // Update every second
+    const interval = setInterval(updateTime, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const getStatusColor = () => {
     if (error) return 'text-red-600 dark:text-red-400';
     if (connected) return 'text-green-600 dark:text-green-400';
@@ -105,7 +124,7 @@ export function StatusBar({
               <span>•</span>
             </>
           )}
-          <span>{new Date().toLocaleTimeString()}</span>
+          <span>{currentTime}</span>
         </div>
 
         {/* Disconnect Button */}

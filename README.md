@@ -151,14 +151,14 @@ Once connected, the system uses a comprehensive event system for real-time commu
 │   React Demo    │    │  Server Actions  │    │  OpenAI API     │
 │                 │    │                  │    │                 │
 │ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │useRealtime  │ │    │ │createSession │ │    │ │Session      │ │
-│ │Client Hook  │ │    │ │Server Action │ │    │ │Creation     │ │
+│ │Realtime     │ │    │ │createSession │ │    │ │Session      │ │
+│ │Client       │ │    │ │Server Action │ │    │ │Creation     │ │
 │ └─────────────┘ │    │ └──────────────┘ │    │ └─────────────┘ │
 │         │       │    │         │        │    │         │       │
 │         ▼       │    │         ▼        │    │         ▼       │
 │ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │Realtime     │ │    │ │Server Module │ │    │ │WebRTC       │ │
-│ │Client Class │ │    │ │(API Wrapper) │ │    │ │Connection   │ │
+│ │WebRTC       │ │    │ │Server Module │ │    │ │WebRTC       │ │
+│ │Connection   │ │    │ │(API Wrapper) │ │    │ │Connection   │ │
 │ └─────────────┘ │    │ └──────────────┘ │    │ └─────────────┘ │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
@@ -171,25 +171,28 @@ Our abstraction layer provides multiple levels of API access:
 
 ```typescript
 // Simple conversation flow
-await sendTextMessage('Hello, how are you?');
-await requestResponse();
-const items = conversationItems;
-const responding = isResponding;
+const client = new RealtimeClient(config);
+await client.sendTextMessage('Hello, how are you?');
+await client.requestResponse();
+const items = client.getConversationItems();
+const responding = client.isResponding();
 ```
 
 **Event Callbacks** (For reactive UI updates):
 
 ```typescript
-const { onConversationItemCreated, onResponseCreated } = useRealtimeClient({
+const client = new RealtimeClient({
   onConversationItemCreated: (item) => console.log('New message:', item),
   onResponseCreated: (response) => console.log('AI started responding'),
+  onSpeechStarted: () => console.log('User started speaking'),
+  onSpeechStopped: () => console.log('User stopped speaking'),
 });
 ```
 
 **Raw Event Access** (For advanced use cases):
 
 ```typescript
-const { onRawEvent } = useRealtimeClient({
+const client = new RealtimeClient({
   onRawEvent: (event) => {
     // Handle any server event with full type safety
     switch (event.type) {
@@ -220,15 +223,7 @@ const { onRawEvent } = useRealtimeClient({
 - **State management**: Conversation tracking, response status
 - **Event abstraction**: Converts raw events to callbacks
 
-**3. useRealtimeClient Hook (`src/lib/openai-realtime/useRealtimeClient.ts`)**
-
-- React hook wrapper for RealtimeClient
-- Manages connection state and conversation state
-- Provides clean API for components
-- **Reactive state**: `conversationItems`, `isResponding`, `currentResponseId`
-- **High-level methods**: All client methods exposed as async functions
-
-**4. Type System (`src/lib/openai-realtime/types/`)**
+**3. Type System (`src/lib/openai-realtime/types/`)**
 
 - Complete TypeScript definitions
 - Session configuration types
@@ -256,7 +251,7 @@ const { onRawEvent } = useRealtimeClient({
    ↓
 9. Events flow through abstraction layer
    ↓
-10. UI updates reactively via callbacks/state
+10. UI updates reactively via callbacks
 ```
 
 ### 📦 Usage
@@ -264,17 +259,10 @@ const { onRawEvent } = useRealtimeClient({
 #### **Basic Setup**
 
 ```typescript
-import { useRealtimeClient } from '@/lib/openai-realtime/useRealtimeClient';
+import { RealtimeClient } from '@/lib/openai-realtime/client/RealtimeClient';
 
 function MyComponent() {
-  const {
-    connect,
-    sendTextMessage,
-    requestResponse,
-    conversationItems,
-    isResponding,
-    connected,
-  } = useRealtimeClient({
+  const client = new RealtimeClient({
     clientSecret: 'your-client-secret',
     realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
     onMessageToken: (token) => console.log('AI:', token),
@@ -282,17 +270,16 @@ function MyComponent() {
   });
 
   const startConversation = async () => {
-    await connect();
-    await sendTextMessage("Hello!");
-    await requestResponse();
+    await client.connect();
+    await client.sendTextMessage("Hello!");
+    await client.requestResponse();
   };
 
   return (
     <div>
-      <button onClick={startConversation} disabled={!connected}>
+      <button onClick={startConversation}>
         Start Conversation
       </button>
-      {isResponding && <p>AI is thinking...</p>}
     </div>
   );
 }
@@ -301,95 +288,33 @@ function MyComponent() {
 #### **Advanced Usage with Event Callbacks**
 
 ```typescript
-const { connect, sendTextMessage, requestResponse, conversationItems } =
-  useRealtimeClient({
-    clientSecret: 'your-secret',
-    realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
-
-    // High-level callbacks
-    onConversationItemCreated: (item) => {
-      console.log('New conversation item:', item);
-    },
-    onResponseCreated: (response) => {
-      console.log('AI started responding:', response.id);
-    },
-    onResponseDone: (response) => {
-      console.log('AI finished responding:', response.id);
-    },
-
-    // Speech detection
-    onSpeechStarted: () => {
-      console.log('User started speaking');
-    },
-    onSpeechStopped: () => {
-      console.log('User stopped speaking');
-    },
-
-    // Raw event access (for advanced use cases)
-    onRawEvent: (event) => {
-      console.log('Raw event:', event.type, event);
-    },
-  });
-```
-
-#### **Enhanced Audio and Conversation Management**
-
-```typescript
-const {
-  // Audio buffer management
-  appendAudioData,
-  commitAudioBuffer,
-  clearAudioBuffer,
-
-  // Conversation management
-  retrieveConversationItem,
-  truncateConversationItem,
-  deleteConversationItem,
-
-  // Enhanced response management
-  cancelSpecificResponse,
-
-  // State tracking
-  isSpeaking,
-  hasAudioBuffer,
-  isResponding,
-} = useRealtimeClient({
+const client = new RealtimeClient({
   clientSecret: 'your-secret',
   realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
-});
 
-// Manual audio buffer management
-await appendAudioData(base64AudioData);
-await commitAudioBuffer();
+  // High-level callbacks
+  onConversationItemCreated: (item) => {
+    console.log('New conversation item:', item);
+  },
+  onResponseCreated: (response) => {
+    console.log('AI started responding:', response.id);
+  },
+  onResponseDone: (response) => {
+    console.log('AI finished responding:', response.id);
+  },
 
-// Conversation editing
-await retrieveConversationItem('item_123');
-await truncateConversationItem(5000); // Truncate at 5 seconds
-await deleteConversationItem();
+  // Speech detection
+  onSpeechStarted: () => {
+    console.log('User started speaking');
+  },
+  onSpeechStopped: () => {
+    console.log('User stopped speaking');
+  },
 
-// Cancel specific response
-await cancelSpecificResponse('response_456', 'User interrupted');
-
-// Check states
-if (isSpeaking) {
-  console.log('User is currently speaking');
-}
-if (hasAudioBuffer) {
-  console.log('Audio buffer has data');
-}
-```
-
-#### **Direct Client Usage (Without Hook)**
-
-```typescript
-import { RealtimeClient } from '@/lib/openai-realtime/client/RealtimeClient';
-
-const client = new RealtimeClient({
-  clientSecret: 'your-client-secret',
-  model: process.env.NEXT_PUBLIC_OPENAI_MODEL,
-  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
-  onMessageToken: (token) => console.log('AI:', token),
-  onError: (error) => console.error('Error:', error),
+  // Raw event access (for advanced use cases)
+  onRawEvent: (event) => {
+    console.log('Raw event:', event.type, event);
+  },
 });
 
 // Connect and start conversation
@@ -398,12 +323,42 @@ await client.sendTextMessage('Hello!');
 await client.requestResponse();
 ```
 
-#### **Error Handling**
-
-The abstraction layer provides multiple error handling approaches:
+#### **Enhanced Audio and Conversation Management**
 
 ```typescript
-const { error, onError } = useRealtimeClient({
+const client = new RealtimeClient({
+  clientSecret: 'your-secret',
+  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
+});
+
+// Audio buffer management
+await client.appendAudioData(base64AudioData);
+await client.commitAudioBuffer();
+await client.clearAudioBuffer();
+
+// Conversation management
+await client.retrieveConversationItem('item_123');
+await client.truncateConversationItem(5000); // Truncate at 5 seconds
+await client.deleteConversationItem();
+
+// Enhanced response management
+await client.cancelSpecificResponse('response_456', 'User interrupted');
+
+// Check states
+if (client.isSpeaking()) {
+  console.log('User is currently speaking');
+}
+if (client.hasAudioBuffer()) {
+  console.log('Audio buffer has data');
+}
+```
+
+#### **Error Handling**
+
+The client provides multiple error handling approaches:
+
+```typescript
+const client = new RealtimeClient({
   // ... config
   onError: (error) => {
     console.error('Connection error:', error);
@@ -414,9 +369,11 @@ const { error, onError } = useRealtimeClient({
   },
 });
 
-// Check error state in UI
-if (error) {
-  return <div>Error: {error.message}</div>;
+// Check error state
+try {
+  await client.connect();
+} catch (error) {
+  console.error('Failed to connect:', error);
 }
 ```
 
