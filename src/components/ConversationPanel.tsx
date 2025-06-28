@@ -1,12 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Item,
-  MessageRole,
-  ContentType,
-  ServerEventType,
-} from '@/lib/openai-realtime/types';
+import { Item, MessageRole, ContentType } from '@/lib/openai-realtime/types';
 
 interface EventLogItem {
   id: string;
@@ -37,33 +32,58 @@ export function ConversationPanel({
   // Group events by conversation flow using real event types
   const conversationEvents = events.filter((event) =>
     [
-      ServerEventType.RESPONSE_TEXT_DELTA,
-      ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA,
-      'connection_state_change',
-      ServerEventType.SESSION_CREATED,
-      ServerEventType.SESSION_UPDATED,
-      ServerEventType.CONVERSATION_ITEM_CREATED,
-      ServerEventType.RESPONSE_CREATED,
-      ServerEventType.RESPONSE_DONE,
-      ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED,
-      ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED,
+      'response.text.delta',
+      'response.audio_transcript.delta',
+      'response.audio_transcript.done',
+      'conversation.item.input_audio_transcription.delta',
+      'conversation.item.input_audio_transcription.completed',
+      'session.created',
+      'session.updated',
+      'conversation.item.created',
+      'response.created',
+      'response.done',
+      'input_audio_buffer.speech_started',
+      'input_audio_buffer.speech_stopped',
     ].includes(event.type)
   );
 
   // Get current conversation state from events
-  const currentTranscript = events
-    .filter((e) => e.type === ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA)
-    .map((e) => e.data.delta as string)
+  // Handle input audio transcription (user speech) - both delta and completed events
+  const currentInputTranscript = events
+    .filter(
+      (e) =>
+        e.type === 'conversation.item.input_audio_transcription.delta' ||
+        e.type === 'conversation.item.input_audio_transcription.completed'
+    )
+    .map((e) => {
+      // The event data is nested in e.data.data for raw events
+      const eventData = e.data.data as { delta?: string; transcript?: string };
+      return eventData?.delta || eventData?.transcript || '';
+    })
+    .join('');
+
+  // Handle response audio transcript (AI speech) - both delta and done events
+  const currentResponseTranscript = events
+    .filter(
+      (e) =>
+        e.type === 'response.audio_transcript.delta' ||
+        e.type === 'response.audio_transcript.done'
+    )
+    .map((e) => {
+      // The event data is nested in e.data.data for raw events
+      const eventData = e.data.data as { delta?: string; transcript?: string };
+      return eventData?.delta || eventData?.transcript || '';
+    })
     .join(' ');
 
   const currentResponse = events
-    .filter((e) => e.type === ServerEventType.RESPONSE_TEXT_DELTA)
-    .map((e) => e.data.delta as string)
+    .filter((e) => e.type === 'response.text.delta')
+    .map((e) => {
+      // The event data is nested in e.data.data for raw events
+      const eventData = e.data.data as { delta?: string };
+      return eventData?.delta || '';
+    })
     .join('');
-
-  const connectionState =
-    (events.filter((e) => e.type === 'connection_state_change').pop()?.data
-      .state as string) || 'disconnected';
 
   // Handle text message submission
   const handleSendMessage = () => {
@@ -80,15 +100,17 @@ export function ConversationPanel({
     }
   };
 
-  // Render conversation items
+  // Render conversation items as chat thread
   const renderConversationItems = () => {
     return conversationItems.map((item, index) => {
       if (item.type === 'message') {
         const isUser = item.role === MessageRole.USER;
+        // Find the first text content (could be input_text or text)
         const textContent = item.content.find(
-          (content) => content.type === ContentType.TEXT
+          (content) =>
+            content.type === ContentType.TEXT ||
+            content.type === ContentType.INPUT_TEXT
         );
-
         if (textContent && 'text' in textContent) {
           return (
             <div
@@ -143,23 +165,6 @@ export function ConversationPanel({
       </h3>
 
       <div className="space-y-6">
-        {/* Connection Status */}
-        <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700 rounded-md">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              connected ? 'bg-green-500' : 'bg-gray-400'
-            }`}
-          />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {connected ? 'Connected' : 'Disconnected'}
-          </span>
-          {connectionState !== 'disconnected' && (
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              ({connectionState})
-            </span>
-          )}
-        </div>
-
         {/* Conversation Flow */}
         <div className="space-y-4">
           {/* Conversation Items */}
@@ -167,11 +172,13 @@ export function ConversationPanel({
             <div className="space-y-4">{renderConversationItems()}</div>
           )}
 
-          {/* Current Live Input/Response */}
-          {(currentTranscript || currentResponse) && (
+          {/* Current Live Input/Response (streaming, not yet committed) */}
+          {(currentInputTranscript ||
+            currentResponseTranscript ||
+            currentResponse) && (
             <div className="space-y-4">
-              {/* User Input */}
-              {currentTranscript && (
+              {/* User Input (streaming) */}
+              {currentInputTranscript && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
@@ -182,14 +189,33 @@ export function ConversationPanel({
                         You said:
                       </p>
                       <p className="text-blue-800 dark:text-blue-200">
-                        &quot;{currentTranscript}&quot;
+                        &quot;{currentInputTranscript}&quot;
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* AI Response */}
+              {/* AI Response (streaming) */}
+              {currentResponseTranscript && (
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                      AI
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
+                        AI Response:
+                      </p>
+                      <p className="text-green-800 dark:text-green-200">
+                        &quot;{currentResponseTranscript}&quot;
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Response (text, streaming) */}
               {currentResponse && (
                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
                   <div className="flex items-start gap-3">
@@ -239,7 +265,8 @@ export function ConversationPanel({
           )}
 
           {/* Empty State */}
-          {!currentTranscript &&
+          {!currentInputTranscript &&
+            !currentResponseTranscript &&
             !currentResponse &&
             conversationItems.length === 0 &&
             connected && (

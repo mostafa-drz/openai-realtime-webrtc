@@ -6,6 +6,8 @@ interface StatusBarProps {
   error: Error | null;
   isResponding?: boolean;
   conversationItemCount?: number;
+  transcriptionEnabled?: boolean;
+  onDisconnect?: () => void;
 }
 
 export function StatusBar({
@@ -14,6 +16,8 @@ export function StatusBar({
   error,
   isResponding = false,
   conversationItemCount = 0,
+  transcriptionEnabled = false,
+  onDisconnect,
 }: StatusBarProps) {
   const getStatusColor = () => {
     if (error) return 'text-red-600 dark:text-red-400';
@@ -66,6 +70,22 @@ export function StatusBar({
             </div>
           )}
 
+          {/* Transcription Status */}
+          {connected && (
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  transcriptionEnabled ? 'bg-blue-500' : 'bg-gray-400'
+                }`}
+              />
+              <span className="text-xs text-slate-600 dark:text-slate-400">
+                {transcriptionEnabled
+                  ? 'Transcription On'
+                  : 'Transcription Off'}
+              </span>
+            </div>
+          )}
+
           {/* Response Status */}
           {connected && isResponding && (
             <div className="flex items-center gap-2">
@@ -87,6 +107,16 @@ export function StatusBar({
           )}
           <span>{new Date().toLocaleTimeString()}</span>
         </div>
+
+        {/* Disconnect Button */}
+        {connected && onDisconnect && (
+          <button
+            onClick={onDisconnect}
+            className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+          >
+            Disconnect
+          </button>
+        )}
       </div>
 
       {/* Error Details */}

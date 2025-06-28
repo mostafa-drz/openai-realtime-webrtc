@@ -5,6 +5,8 @@ import {
   Voice,
   AudioFormat,
   Modality,
+  TranscriptionModel,
+  TranscriptionConfig,
 } from '@/lib/openai-realtime/types';
 
 interface SettingsPanelProps {
@@ -35,11 +37,66 @@ const MODALITY_OPTIONS = [
   { value: [Modality.TEXT], label: 'Text Only' },
 ];
 
+const TRANSCRIPTION_MODEL_OPTIONS = [
+  {
+    value: TranscriptionModel.GPT4O_TRANSCRIBE,
+    label: 'GPT-4o Transcribe (Best Quality)',
+  },
+  {
+    value: TranscriptionModel.GPT4O_MINI_TRANSCRIBE,
+    label: 'GPT-4o Mini Transcribe (Fast)',
+  },
+  { value: TranscriptionModel.WHISPER_1, label: 'Whisper-1 (Legacy)' },
+];
+
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+  { value: 'it', label: 'Italian' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'ru', label: 'Russian' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'zh', label: 'Chinese' },
+];
+
 export function SettingsPanel({
   config,
   onConfigChange,
   disabled,
 }: SettingsPanelProps) {
+  // Helper function to handle transcription toggle
+  const handleTranscriptionToggle = (enabled: boolean) => {
+    if (enabled) {
+      onConfigChange({
+        input_audio_transcription: {
+          model: TranscriptionModel.GPT4O_TRANSCRIBE,
+          language: 'en',
+        },
+      });
+    } else {
+      onConfigChange({
+        input_audio_transcription: null,
+      });
+    }
+  };
+
+  // Helper function to update transcription config
+  const updateTranscriptionConfig = (updates: Partial<TranscriptionConfig>) => {
+    if (config.input_audio_transcription) {
+      onConfigChange({
+        input_audio_transcription: {
+          ...config.input_audio_transcription,
+          ...updates,
+        },
+      });
+    }
+  };
+
+  const transcriptionEnabled = config.input_audio_transcription !== null;
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
       <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
@@ -47,6 +104,101 @@ export function SettingsPanel({
       </h3>
 
       <div className="space-y-4">
+        {/* Transcription Settings */}
+        <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-md font-medium text-slate-900 dark:text-slate-100">
+              Audio Transcription
+            </h4>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={transcriptionEnabled}
+                onChange={(e) => handleTranscriptionToggle(e.target.checked)}
+                disabled={disabled}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600 disabled:opacity-50"></div>
+              <span className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                {transcriptionEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </label>
+          </div>
+
+          {transcriptionEnabled && (
+            <div className="space-y-3">
+              {/* Transcription Model */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Transcription Model
+                </label>
+                <select
+                  value={
+                    config.input_audio_transcription?.model ||
+                    TranscriptionModel.GPT4O_TRANSCRIBE
+                  }
+                  onChange={(e) =>
+                    updateTranscriptionConfig({
+                      model: e.target.value as TranscriptionModel,
+                    })
+                  }
+                  disabled={disabled}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  {TRANSCRIPTION_MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Language */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Language
+                </label>
+                <select
+                  value={config.input_audio_transcription?.language || 'en'}
+                  onChange={(e) =>
+                    updateTranscriptionConfig({
+                      language: e.target.value,
+                    })
+                  }
+                  disabled={disabled}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  {LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Prompt */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Transcription Prompt (Optional)
+                </label>
+                <textarea
+                  value={config.input_audio_transcription?.prompt || ''}
+                  onChange={(e) =>
+                    updateTranscriptionConfig({ prompt: e.target.value })
+                  }
+                  disabled={disabled}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
+                  placeholder="Keywords for whisper-1, free text for gpt-4o-transcribe models..."
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Keywords for whisper-1, free text for gpt-4o-transcribe models
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Modality Selection */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
