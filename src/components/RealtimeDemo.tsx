@@ -161,6 +161,10 @@ export function RealtimeDemo() {
             // Auto-commit audio for transcription
             clientRef.current?.commitAudioBuffer();
             break;
+          case 'input_audio_buffer.committed':
+            break;
+          case 'input_audio_buffer.cleared':
+            break;
           case ServerEventType.SESSION_CREATED:
             break;
           case ServerEventType.RESPONSE_CREATED:

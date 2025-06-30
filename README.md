@@ -323,6 +323,84 @@ await client.sendTextMessage('Hello!');
 await client.requestResponse();
 ```
 
+#### **State Management (Consumer Responsibility)**
+
+The RealtimeClient no longer manages conversation state internally. Consumers are responsible for managing their own state:
+
+```typescript
+// Example: Managing conversation state in your application
+const [conversationItems, setConversationItems] = useState([]);
+const [isResponding, setIsResponding] = useState(false);
+const [isSpeaking, setIsSpeaking] = useState(false);
+const [hasAudioBuffer, setHasAudioBuffer] = useState(false);
+
+const client = new RealtimeClient({
+  clientSecret: 'your-secret',
+  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
+
+  onConversationItemCreated: (item) => {
+    setConversationItems((prev) => [...prev, item]);
+  },
+  onResponseCreated: (response) => {
+    setIsResponding(true);
+  },
+  onResponseDone: (response) => {
+    setIsResponding(false);
+  },
+  onSpeechStarted: () => {
+    setIsSpeaking(true);
+  },
+  onSpeechStopped: () => {
+    setIsSpeaking(false);
+  },
+  onRawEvent: (event) => {
+    // Handle audio buffer state
+    if (
+      event.type === 'input_audio_buffer.committed' ||
+      event.type === 'input_audio_buffer.cleared'
+    ) {
+      setHasAudioBuffer(false);
+    }
+  },
+});
+```
+
+#### **Migration Guide**
+
+If you're upgrading from a previous version that had built-in state management:
+
+**Before (Old API):**
+
+```typescript
+// These methods no longer exist
+if (client.isResponding()) { ... }
+if (client.isSpeaking()) { ... }
+if (client.hasAudioBuffer()) { ... }
+const items = client.getConversationItems(); // Never existed but implied
+```
+
+**After (New API):**
+
+```typescript
+// Manage state in your application
+const [isResponding, setIsResponding] = useState(false);
+const [isSpeaking, setIsSpeaking] = useState(false);
+const [hasAudioBuffer, setHasAudioBuffer] = useState(false);
+const [conversationItems, setConversationItems] = useState([]);
+
+// Use callbacks to update state
+const client = new RealtimeClient({
+  // ... config
+  onResponseCreated: () => setIsResponding(true),
+  onResponseDone: () => setIsResponding(false),
+  onSpeechStarted: () => setIsSpeaking(true),
+  onSpeechStopped: () => setIsSpeaking(false),
+  onConversationItemCreated: (item) => {
+    setConversationItems((prev) => [...prev, item]);
+  },
+});
+```
+
 #### **Enhanced Audio and Conversation Management**
 
 ```typescript
@@ -363,6 +441,9 @@ if (client.hasAudioBuffer()) {
 | `updateTranscriptionSession(config)`   | Sends transcription session update event             | `config: Partial<TranscriptionSessionConfig>` | Update transcription parameters during active session                         |
 | `disconnect()`                         | Closes WebRTC connection and cleans up resources     | None                                          | Properly end session and free system resources                                |
 | `isConnected()`                        | Returns connection status                            | None                                          | Check if client is connected before making API calls                          |
+| `getSessionId()`                       | Returns current session ID                           | None                                          | Get session identifier for logging or debugging                               |
+| `getSessionType()`                     | Returns session type (regular/transcription)         | None                                          | Determine session capabilities and behavior                                   |
+| `getConnectionState()`                 | Returns current connection state                     | None                                          | Get detailed connection status for UI feedback                                |
 | `sendTextMessage(text, role?)`         | Sends text message to conversation                   | `text: string`, `role?: MessageRole`          | Add text messages in regular sessions                                         |
 | `requestResponse(options?)`            | Requests AI response from conversation               | `options?: Partial<ResponseConfig>`           | Trigger AI response after adding messages                                     |
 | `cancelResponse(reason?)`              | Cancels current AI response                          | `reason?: string`                             | Stop ongoing AI response generation                                           |
@@ -375,6 +456,8 @@ if (client.hasAudioBuffer()) {
 | `deleteConversationItem()`             | Deletes any item from conversation history           | None                                          | Remove unwanted messages, clean up history, privacy control                   |
 
 **Note:** Methods marked with **Manual audio control** are essential for push-to-talk, walkie-talkie, or manual transcription interfaces where you want to control when audio is sent to the AI, as opposed to automatic streaming used in the current demo.
+
+**State Management:** The client no longer provides state checking methods like `isResponding()`, `isSpeaking()`, or `hasAudioBuffer()`. Consumers must manage these states using the provided event callbacks.
 
 #### **Error Handling**
 

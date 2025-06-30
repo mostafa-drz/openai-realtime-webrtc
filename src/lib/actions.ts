@@ -35,8 +35,6 @@ export async function createRealtimeSession(config: SessionConfig) {
       },
     };
   } catch (error) {
-    console.error('Session creation error:', error);
-
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -70,8 +68,6 @@ export async function createRealtimeTranscriptionSession(
       },
     };
   } catch (error) {
-    console.error('Transcription session creation error:', error);
-
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

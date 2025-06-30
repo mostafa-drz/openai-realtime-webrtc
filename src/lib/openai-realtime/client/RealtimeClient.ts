@@ -23,7 +23,7 @@ export interface RealtimeClientConfig {
   onTranscript?: (text: string) => void;
   onConnectionStateChange?: (state: ConnectionState) => void;
   onError?: (error: Error) => void;
-  // New high-level callbacks
+  // High-level callbacks
   onConversationItemCreated?: (item: Item) => void;
   onResponseCreated?: (response: Response) => void;
   onResponseDone?: (response: Response) => void;
@@ -31,14 +31,6 @@ export interface RealtimeClientConfig {
   onSpeechStopped?: () => void;
   // Raw event access
   onRawEvent?: (event: ServerEvent) => void;
-}
-
-export interface ConversationState {
-  items: Item[];
-  currentResponseId?: string;
-  isResponding: boolean;
-  isSpeaking: boolean;
-  hasAudioBuffer: boolean;
 }
 
 export type SessionType = 'regular' | 'transcription';
@@ -51,15 +43,6 @@ export class RealtimeClient {
   private sessionType: SessionType;
   private pc?: RTCPeerConnection;
   private dataChannel?: RTCDataChannel;
-
-  // Enhanced state management
-  private conversationState: ConversationState = {
-    items: [],
-    currentResponseId: undefined,
-    isResponding: false,
-    isSpeaking: false,
-    hasAudioBuffer: false,
-  };
 
   constructor(config: RealtimeClientConfig) {
     this.config = config;
@@ -94,10 +77,6 @@ export class RealtimeClient {
             : 'regular';
         break;
       }
-      case ServerEventType.TRANSCRIPTION_SESSION_UPDATED: {
-        this.sessionType = 'transcription';
-        break;
-      }
       case ServerEventType.RESPONSE_TEXT_DELTA: {
         const token = event?.delta || '';
         this.config.onMessageToken?.(token);
@@ -109,32 +88,22 @@ export class RealtimeClient {
         break;
       }
       case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED: {
-        this.conversationState.isSpeaking = true;
         this.config.onSpeechStarted?.();
         break;
       }
       case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED: {
-        this.conversationState.isSpeaking = false;
         this.config.onSpeechStopped?.();
         break;
       }
-      case ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED: {
-        this.conversationState.hasAudioBuffer = false;
-        break;
-      }
       case ServerEventType.CONVERSATION_ITEM_CREATED: {
-        this.conversationState.items.push(event.item);
         this.config.onConversationItemCreated?.(event.item);
         break;
       }
       case ServerEventType.RESPONSE_CREATED: {
-        this.conversationState.currentResponseId = event.response.id;
-        this.conversationState.isResponding = true;
         this.config.onResponseCreated?.(event.response);
         break;
       }
       case ServerEventType.RESPONSE_DONE: {
-        this.conversationState.isResponding = false;
         this.config.onResponseDone?.(event.response);
         break;
       }
@@ -144,7 +113,7 @@ export class RealtimeClient {
         break;
       }
       default: {
-        console.debug('[RealtimeClient] Unhandled server event:', event);
+        break;
       }
     }
   }
@@ -212,11 +181,11 @@ export class RealtimeClient {
 
       if (!resp.ok) {
         const errorText = await resp.text();
-        console.error(
-          '[RealtimeClient] SDP request failed:',
-          resp.status,
-          errorText
-        );
+        // console.error(
+        //   '[RealtimeClient] SDP request failed:',
+        //   resp.status,
+        //   errorText
+        // );
         throw new Error(`SDP request failed: ${resp.status} - ${errorText}`);
       }
 
@@ -287,6 +256,19 @@ export class RealtimeClient {
 
   isConnected(): boolean {
     return this.connectionState === ConnectionState.CONNECTED;
+  }
+
+  // Public getters for essential operational state
+  getSessionId(): string | undefined {
+    return this.sessionId;
+  }
+
+  getSessionType(): SessionType {
+    return this.sessionType;
+  }
+
+  getConnectionState(): ConnectionState {
+    return this.connectionState;
   }
 
   // High-level conversation methods
@@ -389,7 +371,6 @@ export class RealtimeClient {
       audio: audioBase64,
     };
     this.sendEvent(event);
-    this.conversationState.hasAudioBuffer = true;
   }
 
   // Enhanced Conversation Management
