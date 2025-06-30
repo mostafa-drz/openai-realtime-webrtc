@@ -153,17 +153,17 @@ export function RealtimeDemo() {
         });
         // Only manage state here, not chat thread
         switch (event.type) {
-          case 'input_audio_buffer.speech_started':
+          case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED:
             setMicActive(true);
             break;
-          case 'input_audio_buffer.speech_stopped':
+          case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED:
             setMicActive(false);
             // Auto-commit audio for transcription
             clientRef.current?.commitAudioBuffer();
             break;
-          case 'input_audio_buffer.committed':
+          case ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED:
             break;
-          case 'input_audio_buffer.cleared':
+          case ServerEventType.INPUT_AUDIO_BUFFER_CLEARED:
             break;
           case ServerEventType.SESSION_CREATED:
             break;
