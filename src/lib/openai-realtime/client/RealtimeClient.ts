@@ -378,22 +378,9 @@ export class RealtimeClient {
     this.sendEvent(event);
   }
 
-  // State getters
-  getConversationState(): ConversationState {
-    return { ...this.conversationState };
-  }
-
-  getConversationItems(): Item[] {
-    return [...this.conversationState.items];
-  }
-
-  isResponding(): boolean {
-    return this.conversationState.isResponding;
-  }
-
   // Audio Buffer Management
   async appendAudioData(audioBase64: string): Promise<void> {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+    if (!this.isDataChannelOpen()) {
       throw new Error('Data channel is not open.');
     }
 
@@ -407,7 +394,7 @@ export class RealtimeClient {
 
   // Enhanced Conversation Management
   async retrieveConversationItem(itemId: string): Promise<void> {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+    if (!this.isDataChannelOpen()) {
       throw new Error('Data channel is not open.');
     }
 
@@ -419,7 +406,7 @@ export class RealtimeClient {
   }
 
   async truncateConversationItem(audioEndMs: number): Promise<void> {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+    if (!this.isDataChannelOpen()) {
       throw new Error('Data channel is not open.');
     }
 
@@ -431,7 +418,7 @@ export class RealtimeClient {
   }
 
   async deleteConversationItem(): Promise<void> {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+    if (!this.isDataChannelOpen()) {
       throw new Error('Data channel is not open.');
     }
 
@@ -441,39 +428,11 @@ export class RealtimeClient {
     this.sendEvent(event);
   }
 
-  // Enhanced Response Management
-  async cancelSpecificResponse(
-    responseId: string,
-    reason?: string
-  ): Promise<void> {
-    if (this.isTranscriptionSession()) {
-      throw new Error(
-        'AI responses are not supported in transcription sessions'
-      );
-    }
-
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-      throw new Error('Data channel is not open.');
-    }
-
-    const event = {
-      type: ClientEventType.RESPONSE_CANCEL,
-      response_id: responseId,
-      reason: reason || 'User cancelled',
-    };
-    this.sendEvent(event);
-  }
-
-  // Enhanced State Getters
-  isSpeaking(): boolean {
-    return this.conversationState.isSpeaking;
-  }
-
-  hasAudioBuffer(): boolean {
-    return this.conversationState.hasAudioBuffer;
-  }
-
   private isTranscriptionSession(): boolean {
     return this.sessionType === 'transcription';
+  }
+
+  private isDataChannelOpen(): boolean {
+    return this.dataChannel?.readyState === 'open';
   }
 }

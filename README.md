@@ -369,6 +369,10 @@ if (client.hasAudioBuffer()) {
 | `commitAudioBuffer()`                | Commits current audio buffer to conversation         | None                                          | **Manual audio control**: Push-to-talk, walkie-talkie, manual transcription |
 | `clearAudioBuffer()`                 | Clears current audio buffer without committing       | None                                          | **Manual audio control**: Cancel recording, re-record, error recovery       |
 | `clearOutputAudioBuffer()`           | Clears output audio buffer                           | None                                          | Stop currently playing AI audio output                                      |
+| `appendAudioData(audioBase64)`       | Appends audio data to buffer                         | `audioBase64: string`                         | **Manual audio control**: Build up audio buffer before committing           |
+| `retrieveConversationItem(itemId)`   | Retrieves specific conversation item                 | `itemId: string`                              | Load messages from history, implement search                                |
+| `truncateConversationItem(audioEndMs)` | Truncates assistant message audio at timestamp      | `audioEndMs: number`                          | **User interruption**: Truncate unplayed AI audio, sync playback with context |
+| `deleteConversationItem()`           | Deletes any item from conversation history           | None                                          | Remove unwanted messages, clean up history, privacy control                  |
 
 **Note:** Methods marked with **Manual audio control** are essential for push-to-talk, walkie-talkie, or manual transcription interfaces where you want to control when audio is sent to the AI, as opposed to automatic streaming used in the current demo.
 
