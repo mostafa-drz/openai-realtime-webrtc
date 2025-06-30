@@ -325,7 +325,6 @@ export function RealtimeDemo() {
         // Automatically start recording after successful session creation
         try {
           if (clientRef.current) {
-            await clientRef.current.startVoiceInput();
             addEvent('voice_started', {});
           }
         } catch (voiceErr) {

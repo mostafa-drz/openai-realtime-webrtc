@@ -231,27 +231,6 @@ export class RealtimeClient {
     }
   }
 
-  async startVoiceInput(): Promise<void> {
-    if (!this.pc || !this.dataChannel) {
-      throw new Error(
-        'PeerConnection is not initialized. Call connect() first.'
-      );
-    }
-
-    if (this.micActive) return;
-
-    // Audio track is already added during connection, just mark as active
-    this.micActive = true;
-  }
-
-  async stopVoiceInput(): Promise<void> {
-    if (!this.pc) return;
-
-    // Note: We don't remove the audio track since it's needed for the connection
-    // We just mark the mic as inactive for UI purposes
-    this.micActive = false;
-  }
-
   updateSession(config: Partial<SessionConfig>): void {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
       throw new Error('Data channel is not open.');
@@ -308,15 +287,6 @@ export class RealtimeClient {
 
   isConnected(): boolean {
     return this.connectionState === ConnectionState.CONNECTED;
-  }
-
-  getStatus() {
-    return {
-      connection: this.connectionState,
-      isMicStreaming: this.micActive,
-      sessionId: this.sessionId,
-      sessionType: this.sessionType,
-    };
   }
 
   // High-level conversation methods
