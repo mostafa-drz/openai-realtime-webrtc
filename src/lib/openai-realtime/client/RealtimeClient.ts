@@ -21,9 +21,7 @@ export interface RealtimeClientConfig {
   sessionType?: SessionType;
   onMessageToken?: (token: string) => void;
   onTranscript?: (text: string) => void;
-  onConnectionStateChange?: (
-    state: 'connecting' | 'connected' | 'disconnected' | 'error'
-  ) => void;
+  onConnectionStateChange?: (state: ConnectionState) => void;
   onError?: (error: Error) => void;
   // New high-level callbacks
   onConversationItemCreated?: (item: Item) => void;
@@ -326,7 +324,7 @@ export class RealtimeClient {
     text: string,
     role: MessageRole = MessageRole.USER
   ): Promise<void> {
-    if (this.sessionType === 'transcription') {
+    if (this.isTranscriptionSession()) {
       throw new Error(
         'Text messages are not supported in transcription sessions'
       );
@@ -353,7 +351,7 @@ export class RealtimeClient {
   }
 
   async requestResponse(options?: Partial<ResponseConfig>): Promise<void> {
-    if (this.sessionType === 'transcription') {
+    if (this.isTranscriptionSession()) {
       throw new Error(
         'AI responses are not supported in transcription sessions'
       );
@@ -372,7 +370,7 @@ export class RealtimeClient {
   }
 
   async cancelResponse(reason?: string): Promise<void> {
-    if (this.sessionType === 'transcription') {
+    if (this.isTranscriptionSession()) {
       throw new Error(
         'AI responses are not supported in transcription sessions'
       );
@@ -478,7 +476,7 @@ export class RealtimeClient {
     responseId: string,
     reason?: string
   ): Promise<void> {
-    if (this.sessionType === 'transcription') {
+    if (this.isTranscriptionSession()) {
       throw new Error(
         'AI responses are not supported in transcription sessions'
       );
@@ -503,5 +501,9 @@ export class RealtimeClient {
 
   hasAudioBuffer(): boolean {
     return this.conversationState.hasAudioBuffer;
+  }
+
+  private isTranscriptionSession(): boolean {
+    return this.sessionType === 'transcription';
   }
 }
