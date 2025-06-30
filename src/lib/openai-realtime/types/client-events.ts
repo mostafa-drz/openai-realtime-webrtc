@@ -95,6 +95,10 @@ export interface ConversationItemRetrieveEvent extends BaseClientEvent {
  */
 export interface ConversationItemTruncateEvent extends BaseClientEvent {
   type: ClientEventType.CONVERSATION_ITEM_TRUNCATE;
+  /** ID of the item to truncate */
+  item_id: string;
+  /** Content index, typically set to 0 */
+  content_index: number;
   /** Inclusive duration in milliseconds */
   audio_end_ms: number;
 }
@@ -104,6 +108,8 @@ export interface ConversationItemTruncateEvent extends BaseClientEvent {
  */
 export interface ConversationItemDeleteEvent extends BaseClientEvent {
   type: ClientEventType.CONVERSATION_ITEM_DELETE;
+  /** ID of the item to delete */
+  item_id: string;
 }
 
 /**
