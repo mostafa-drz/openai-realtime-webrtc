@@ -16,6 +16,49 @@ interface EventLogProps {
 
 export function EventLog({ events }: EventLogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<Record<string, string>>({});
+
+  const copyToClipboard = async (text: string, eventId?: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (eventId) {
+        setCopyStatus((prev) => ({ ...prev, [eventId]: 'Copied!' }));
+        setTimeout(() => {
+          setCopyStatus((prev) => {
+            const newStatus = { ...prev };
+            delete newStatus[eventId];
+            return newStatus;
+          });
+        }, 2000);
+      } else {
+        setCopyStatus((prev) => ({ ...prev, all: 'All events copied!' }));
+        setTimeout(() => {
+          setCopyStatus((prev) => {
+            const newStatus = { ...prev };
+            delete newStatus.all;
+            return newStatus;
+          });
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      if (eventId) {
+        setCopyStatus((prev) => ({ ...prev, [eventId]: 'Failed to copy' }));
+      } else {
+        setCopyStatus((prev) => ({ ...prev, all: 'Failed to copy' }));
+      }
+    }
+  };
+
+  const copyAllEvents = () => {
+    const allEventsJson = JSON.stringify(events, null, 2);
+    copyToClipboard(allEventsJson);
+  };
+
+  const copySingleEvent = (event: EventLogItem) => {
+    const eventJson = JSON.stringify(event, null, 2);
+    copyToClipboard(eventJson, event.id);
+  };
 
   const getEventColor = (type: string) => {
     // Use real event types for better categorization
@@ -202,21 +245,53 @@ export function EventLog({ events }: EventLogProps) {
               {events.length} events
             </span>
           </div>
-          <svg
-            className={`w-5 h-5 text-slate-500 dark:text-slate-400 transition-transform ${
-              isExpanded ? 'rotate-180' : ''
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
+          <div className="flex items-center gap-2">
+            {isExpanded && events.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copyAllEvents();
+                }}
+                className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors flex items-center gap-1"
+                title="Copy all events"
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+                Copy All
+                {copyStatus.all && (
+                  <span className="text-xs text-green-200">
+                    {copyStatus.all}
+                  </span>
+                )}
+              </button>
+            )}
+            <svg
+              className={`w-5 h-5 text-slate-500 dark:text-slate-400 transition-transform ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -251,6 +326,31 @@ export function EventLog({ events }: EventLogProps) {
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             {event.timestamp.toLocaleTimeString()}
                           </span>
+                          <button
+                            onClick={() => copySingleEvent(event)}
+                            className="ml-auto px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-400 rounded transition-colors flex items-center gap-1"
+                            title="Copy event JSON"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                            Copy
+                            {copyStatus[event.id] && (
+                              <span className="text-xs text-green-600 dark:text-green-400">
+                                {copyStatus[event.id]}
+                              </span>
+                            )}
+                          </button>
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                           {event.type}
