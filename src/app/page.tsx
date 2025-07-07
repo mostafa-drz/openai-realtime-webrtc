@@ -1,38 +1,22 @@
 import { RealtimeDemo } from '@/components/RealtimeDemo';
-import Link from 'next/link';
+import { InfoBanner } from '@/components/InfoBanner';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8">
-        <header className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-            OpenAI Realtime WebRTC Demo
-          </h1>
-          <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
-            A comprehensive demo showcasing real-time voice conversations with
-            AI using WebRTC technology. Built with Next.js 15 and TypeScript.
-          </p>
+    <div className="container mx-auto px-4 py-8">
+      <InfoBanner />
 
-          {/* Navigation */}
-          <div className="flex justify-center gap-4 mb-8">
-            <Link
-              href="/"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              Live Chat Demo
-            </Link>
-            <Link
-              href="/transcription"
-              className="px-6 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors font-medium"
-            >
-              Voice Transcription
-            </Link>
-          </div>
-        </header>
-
-        <RealtimeDemo />
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+          Live Chat Demo
+        </h2>
+        <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+          Real-time conversation with AI using WebRTC technology. Speak
+          naturally and get instant responses from the AI assistant.
+        </p>
       </div>
+
+      <RealtimeDemo />
     </div>
   );
 }

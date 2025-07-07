@@ -303,6 +303,39 @@ const client = new RealtimeClient({
 10. UI updates reactively via callbacks
 ```
 
+### 🗣️ Turn Detection: Server VAD vs Semantic VAD
+
+The OpenAI Realtime API supports two advanced turn detection modes for voice interaction:
+
+#### **Server VAD (Voice Activity Detection)**
+
+- Detects speech start/end based on audio volume.
+- Responds at the end of user speech.
+- **Fast**, but may cut off if you pause.
+
+#### **Semantic VAD**
+
+- Uses a turn detection model (in conjunction with VAD) to semantically estimate whether the user has finished speaking.
+- Dynamically sets a timeout based on this probability.
+- For example, if user audio trails off with "uhhm", the model will score a low probability of turn end and wait longer for the user to continue speaking.
+- **More natural conversations**, but may have higher latency.
+
+> **From OpenAI docs:**
+>
+> "Server VAD means that the model will detect the start and end of speech based on audio volume and respond at the end of user speech. Semantic VAD is more advanced and uses a turn detection model (in conjunction with VAD) to semantically estimate whether the user has finished speaking, then dynamically sets a timeout based on this probability. For example, if user audio trails off with 'uhhm', the model will score a low probability of turn end and wait longer for the user to continue speaking. This can be useful for more natural conversations, but may have a higher latency."
+
+#### **Manual Mode**
+
+- You can also set turn detection to `null` to disable automatic detection. In this case, the client must manually trigger model response (e.g., push-to-talk or commit audio buffer).
+
+#### **Demo Session Types**
+
+- **Live Chat (VAD):** Uses Server VAD for fast, automatic turn detection.
+- **Natural Chat (Semantic):** Uses Semantic VAD for more natural, conversational flow.
+- **Manual Chat/Transcription:** Uses manual commit/clear for full control.
+
+See the navigation bar in the demo for hands-on examples of each mode.
+
 ### 📦 Usage
 
 #### **Basic Setup**
