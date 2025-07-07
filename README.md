@@ -91,6 +91,12 @@ npm run dev
 # Open http://localhost:3000
 ```
 
+### 📸 Demo Preview
+
+![OpenAI Realtime WebRTC Demo](/public/screenshots/main.png)
+
+**[🎥 Watch Demo Video](https://youtu.be/6egwG8aExas)** - See the demo in action with real-time voice conversations and speaker-specific transcript callbacks.
+
 #### **Docker Development (Recommended for Quick Start)**
 
 ```bash
