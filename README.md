@@ -8,7 +8,7 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 - WebRTC connection management (audio + data)
 - Voice input and output stream support
 - Custom `RealtimeClient` class with high-level abstraction
-- `useRealtimeClient` React hook with state management
+- `RealtimeClient` class with comprehensive event system
 - **Comprehensive Event System** - Raw event access with high-level APIs
 - **NEW: Speaker-Specific Transcript Callbacks** - Separate handling for user vs assistant transcripts
 - **NEW: Chat-like Interface** - Live streaming and final transcript display
@@ -90,6 +90,12 @@ npm run dev
 
 # Open http://localhost:3000
 ```
+
+### 📸 Demo Preview
+
+![OpenAI Realtime WebRTC Demo](/public/screenshots/main.png)
+
+**[🎥 Watch Demo Video](https://youtu.be/6egwG8aExas)** - See the demo in action with real-time voice conversations and speaker-specific transcript callbacks.
 
 #### **Docker Development (Recommended for Quick Start)**
 
