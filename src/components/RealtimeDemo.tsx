@@ -97,6 +97,7 @@ export function RealtimeDemo() {
   >([]);
 
   const clientRef = useRef<RealtimeClient | null>(null);
+  const audioBufferHasDataRef = useRef(false);
 
   // Collapsible state for session settings
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -213,8 +214,11 @@ export function RealtimeDemo() {
             break;
           case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STOPPED:
             setMicActive(false);
-            // Auto-commit audio for transcription
-            clientRef.current?.commitAudioBuffer();
+            // Only commit if audio has been appended
+            if (audioBufferHasDataRef.current) {
+              clientRef.current?.commitAudioBuffer();
+              audioBufferHasDataRef.current = false;
+            }
             break;
           case ServerEventType.RESPONSE_CREATED:
             setIsResponding(true);

@@ -19,6 +19,7 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 ### 🚀 Quick Start
 
 > **💡 Don't have Node.js installed?** Use Docker instead:
+>
 > ```bash
 > git clone https://github.com/mostafa-drz/openai-realtime-webrtc.git
 > cd openai-realtime-webrtc
@@ -26,8 +27,9 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 > # Edit .env.local with your OpenAI API key
 > docker-compose up --build
 > ```
-> 
+>
 > **Or with Docker directly:**
+>
 > ```bash
 > docker build -t app .
 > docker run -p 3000:3000 --env-file .env.local app
@@ -103,6 +105,7 @@ docker run -p 3000:3000 --env-file .env.local app
 ```
 
 **Docker Benefits:**
+
 - ✅ No Node.js installation required
 - ✅ Hot reloading with code changes
 - ✅ Consistent environment across machines
@@ -223,13 +226,15 @@ const client = new RealtimeClient({
   onResponseCreated: (response) => console.log('AI started responding'),
   onSpeechStarted: () => console.log('User started speaking'),
   onSpeechStopped: () => console.log('User stopped speaking'),
-  
+
   // NEW: Speaker-specific transcript callbacks
   onUserTranscriptDelta: (text) => console.log('User speaking:', text),
   onUserTranscriptDone: (text) => console.log('User finished:', text),
-  onAssistantTranscriptDelta: (text) => console.log('Assistant speaking:', text),
+  onAssistantTranscriptDelta: (text) =>
+    console.log('Assistant speaking:', text),
   onAssistantTranscriptDone: (text) => console.log('Assistant finished:', text),
-  onTranscriptionError: (error) => console.error('Transcription failed:', error),
+  onTranscriptionError: (error) =>
+    console.error('Transcription failed:', error),
 });
 ```
 
@@ -310,7 +315,7 @@ function MyComponent() {
     clientSecret: 'your-client-secret',
     realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
     onMessageToken: (token) => console.log('AI:', token),
-    
+
     // NEW: Speaker-specific transcript handling
     onUserTranscriptDelta: (text) => console.log('You said:', text),
     onAssistantTranscriptDelta: (text) => console.log('AI said:', text),
@@ -341,7 +346,7 @@ The latest version includes speaker-specific transcript callbacks for precise co
 const client = new RealtimeClient({
   clientSecret: 'your-secret',
   realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
-  
+
   // User transcript callbacks
   onUserTranscriptDelta: (text) => {
     // Live user speech as they speak
@@ -353,7 +358,7 @@ const client = new RealtimeClient({
     console.log('User finished:', text);
     saveUserTranscript(text);
   },
-  
+
   // Assistant transcript callbacks
   onAssistantTranscriptDelta: (text) => {
     // Live assistant speech as AI responds
@@ -365,7 +370,7 @@ const client = new RealtimeClient({
     console.log('Assistant finished:', text);
     saveAssistantTranscript(text);
   },
-  
+
   // Error handling
   onTranscriptionError: (error) => {
     console.error('Transcription failed:', error.message);
@@ -538,13 +543,13 @@ if (client.hasAudioBuffer()) {
 
 The latest version provides speaker-specific transcript callbacks for precise control:
 
-| Callback | Description | Parameters | Use Case |
-|----------|-------------|------------|----------|
-| `onUserTranscriptDelta` | Live user speech transcription | `text: string` | Show real-time user speech as they speak |
-| `onUserTranscriptDone` | Final user transcript | `text: string` | Save completed user message to history |
-| `onAssistantTranscriptDelta` | Live assistant speech transcription | `text: string` | Show real-time AI speech as it responds |
-| `onAssistantTranscriptDone` | Final assistant transcript | `text: string` | Save completed AI response to history |
-| `onTranscriptionError` | Transcription error handling | `error: Error` | Handle transcription failures gracefully |
+| Callback                     | Description                         | Parameters     | Use Case                                 |
+| ---------------------------- | ----------------------------------- | -------------- | ---------------------------------------- |
+| `onUserTranscriptDelta`      | Live user speech transcription      | `text: string` | Show real-time user speech as they speak |
+| `onUserTranscriptDone`       | Final user transcript               | `text: string` | Save completed user message to history   |
+| `onAssistantTranscriptDelta` | Live assistant speech transcription | `text: string` | Show real-time AI speech as it responds  |
+| `onAssistantTranscriptDone`  | Final assistant transcript          | `text: string` | Save completed AI response to history    |
+| `onTranscriptionError`       | Transcription error handling        | `error: Error` | Handle transcription failures gracefully |
 
 **Note:** Methods marked with **Manual audio control** are essential for push-to-talk, walkie-talkie, or manual transcription interfaces where you want to control when audio is sent to the AI, as opposed to automatic streaming used in the current demo.
 
