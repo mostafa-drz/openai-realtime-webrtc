@@ -10,7 +10,9 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 - Custom `RealtimeClient` class with high-level abstraction
 - `useRealtimeClient` React hook with state management
 - **Comprehensive Event System** - Raw event access with high-level APIs
-- **NEW: Comprehensive Demo App** - Full-featured UI showcasing all capabilities
+- **NEW: Speaker-Specific Transcript Callbacks** - Separate handling for user vs assistant transcripts
+- **NEW: Chat-like Interface** - Live streaming and final transcript display
+- **NEW: Enhanced Demo App** - Full-featured UI showcasing all capabilities with real-time transcript visualization
 - **Environment Configuration** - Fully configurable via environment variables
 - Future-ready structure for publishing as an npm package
 
@@ -139,7 +141,8 @@ Once connected, the system uses a comprehensive event system for real-time commu
 
 - `session.created/updated` - Session state changes
 - `input_audio_buffer.speech_started/stopped` - Voice activity detection
-- `conversation.item.input_audio_transcription.completed` - Speech-to-text results
+- `conversation.item.input_audio_transcription.delta/completed` - User speech-to-text results
+- `response.audio_transcript.delta/done` - Assistant speech-to-text results
 - `response.content_part.added` - AI response streaming
 - `output_audio_buffer.started/stopped` - Audio playback control
 - `error` - Error notifications
@@ -186,6 +189,13 @@ const client = new RealtimeClient({
   onResponseCreated: (response) => console.log('AI started responding'),
   onSpeechStarted: () => console.log('User started speaking'),
   onSpeechStopped: () => console.log('User stopped speaking'),
+  
+  // NEW: Speaker-specific transcript callbacks
+  onUserTranscriptDelta: (text) => console.log('User speaking:', text),
+  onUserTranscriptDone: (text) => console.log('User finished:', text),
+  onAssistantTranscriptDelta: (text) => console.log('Assistant speaking:', text),
+  onAssistantTranscriptDone: (text) => console.log('Assistant finished:', text),
+  onTranscriptionError: (error) => console.error('Transcription failed:', error),
 });
 ```
 
@@ -266,7 +276,11 @@ function MyComponent() {
     clientSecret: 'your-client-secret',
     realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
     onMessageToken: (token) => console.log('AI:', token),
-    onTranscript: (text) => console.log('You said:', text),
+    
+    // NEW: Speaker-specific transcript handling
+    onUserTranscriptDelta: (text) => console.log('You said:', text),
+    onAssistantTranscriptDelta: (text) => console.log('AI said:', text),
+    onTranscriptionError: (error) => console.error('Transcription error:', error),
   });
 
   const startConversation = async () => {
@@ -284,6 +298,56 @@ function MyComponent() {
   );
 }
 ```
+
+#### **Enhanced Transcript Features**
+
+The latest version includes speaker-specific transcript callbacks for precise control over user and assistant speech:
+
+```typescript
+const client = new RealtimeClient({
+  clientSecret: 'your-secret',
+  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
+  
+  // User transcript callbacks
+  onUserTranscriptDelta: (text) => {
+    // Live user speech as they speak
+    console.log('User speaking:', text);
+    updateUserSubtitle(text);
+  },
+  onUserTranscriptDone: (text) => {
+    // Final user transcript when they finish speaking
+    console.log('User finished:', text);
+    saveUserTranscript(text);
+  },
+  
+  // Assistant transcript callbacks
+  onAssistantTranscriptDelta: (text) => {
+    // Live assistant speech as AI responds
+    console.log('Assistant speaking:', text);
+    updateAssistantSubtitle(text);
+  },
+  onAssistantTranscriptDone: (text) => {
+    // Final assistant transcript when AI finishes
+    console.log('Assistant finished:', text);
+    saveAssistantTranscript(text);
+  },
+  
+  // Error handling
+  onTranscriptionError: (error) => {
+    console.error('Transcription failed:', error.message);
+    showTranscriptionError(error.message);
+  },
+});
+```
+
+**Chat-like Interface Features:**
+
+- **Live Streaming**: Real-time transcript display as users speak
+- **Final Transcripts**: Completed messages moved to conversation history
+- **Speaker Distinction**: Clear visual separation between user and assistant
+- **Error Handling**: Inline error display with recovery options
+- **Auto-scroll**: Automatic scrolling to keep latest messages visible
+- **Session Types**: Works for both regular chat and transcription-only sessions
 
 #### **Advanced Usage with Event Callbacks**
 
@@ -335,32 +399,13 @@ const [isSpeaking, setIsSpeaking] = useState(false);
 const [hasAudioBuffer, setHasAudioBuffer] = useState(false);
 
 const client = new RealtimeClient({
-  clientSecret: 'your-secret',
-  realtimeUrl: process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL,
-
+  // ... config
+  onResponseCreated: () => setIsResponding(true),
+  onResponseDone: () => setIsResponding(false),
+  onSpeechStarted: () => setIsSpeaking(true),
+  onSpeechStopped: () => setIsSpeaking(false),
   onConversationItemCreated: (item) => {
     setConversationItems((prev) => [...prev, item]);
-  },
-  onResponseCreated: (response) => {
-    setIsResponding(true);
-  },
-  onResponseDone: (response) => {
-    setIsResponding(false);
-  },
-  onSpeechStarted: () => {
-    setIsSpeaking(true);
-  },
-  onSpeechStopped: () => {
-    setIsSpeaking(false);
-  },
-  onRawEvent: (event) => {
-    // Handle audio buffer state
-    if (
-      event.type === 'input_audio_buffer.committed' ||
-      event.type === 'input_audio_buffer.cleared'
-    ) {
-      setHasAudioBuffer(false);
-    }
   },
 });
 ```
@@ -455,43 +500,43 @@ if (client.hasAudioBuffer()) {
 | `truncateConversationItem(audioEndMs)` | Truncates assistant message audio at timestamp       | `audioEndMs: number`                          | **User interruption**: Truncate unplayed AI audio, sync playback with context |
 | `deleteConversationItem()`             | Deletes any item from conversation history           | None                                          | Remove unwanted messages, clean up history, privacy control                   |
 
+#### **Transcript Callback Interface**
+
+The latest version provides speaker-specific transcript callbacks for precise control:
+
+| Callback | Description | Parameters | Use Case |
+|----------|-------------|------------|----------|
+| `onUserTranscriptDelta` | Live user speech transcription | `text: string` | Show real-time user speech as they speak |
+| `onUserTranscriptDone` | Final user transcript | `text: string` | Save completed user message to history |
+| `onAssistantTranscriptDelta` | Live assistant speech transcription | `text: string` | Show real-time AI speech as it responds |
+| `onAssistantTranscriptDone` | Final assistant transcript | `text: string` | Save completed AI response to history |
+| `onTranscriptionError` | Transcription error handling | `error: Error` | Handle transcription failures gracefully |
+
 **Note:** Methods marked with **Manual audio control** are essential for push-to-talk, walkie-talkie, or manual transcription interfaces where you want to control when audio is sent to the AI, as opposed to automatic streaming used in the current demo.
 
 **State Management:** The client no longer provides state checking methods like `isResponding()`, `isSpeaking()`, or `hasAudioBuffer()`. Consumers must manage these states using the provided event callbacks.
-
-#### **Error Handling**
-
-The client provides multiple error handling approaches:
-
-```typescript
-const client = new RealtimeClient({
-  // ... config
-  onError: (error) => {
-    console.error('Connection error:', error);
-    // Handle specific error types
-    if (error.message.includes('SDP request failed')) {
-      // Handle connection issues
-    }
-  },
-});
-
-// Check error state
-try {
-  await client.connect();
-} catch (error) {
-  console.error('Failed to connect:', error);
-}
-```
 
 ### 🎯 Demo Application
 
 **Try the live demo!** This project includes a comprehensive demo application that showcases:
 
 - **Real-time Voice Conversations**: Natural voice interaction with AI
+- **Chat-like Interface**: Live streaming and final transcript display
+- **Speaker-Specific Transcripts**: Separate handling for user vs assistant speech
 - **Session Configuration**: Voice selection, temperature, speed controls
 - **Event Logging**: Comprehensive debugging and monitoring
-- **Responsive UI**: Modern, accessible interface
+- **Responsive UI**: Modern, accessible interface with auto-scroll
+- **Error Handling**: Inline transcription error display
 - **Developer Tools**: API examples and integration patterns
+
+**Key Demo Features:**
+
+- **Live Transcript Streaming**: See your speech transcribed in real-time as you speak
+- **Final Transcript History**: Completed messages saved to conversation history
+- **Assistant Response Visualization**: Watch AI responses stream in real-time
+- **Error Recovery**: Graceful handling of transcription failures
+- **Session Type Support**: Both regular chat and transcription-only modes
+- **Event Timeline**: Complete event logging for debugging
 
 **Quick Start:**
 
@@ -502,59 +547,3 @@ npm run dev
 ```
 
 See [DEMO_README.md](./DEMO_README.md) for detailed demo documentation.
-
-### 🔧 Configuration Options
-
-#### **Environment-Specific Setup**
-
-**Development:**
-
-```env
-OPENAI_API_KEY=your_dev_key
-NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
-```
-
-**Production:**
-
-```env
-OPENAI_API_KEY=your_prod_key
-OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_REALTIME_SESSION_URL=https://api.openai.com/v1/realtime/sessions
-NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL=https://api.openai.com/v1/realtime
-NEXT_PUBLIC_OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17
-```
-
-**Custom Endpoints:**
-
-```env
-# For custom OpenAI-compatible endpoints
-OPENAI_API_BASE_URL=https://your-custom-endpoint.com/v1
-OPENAI_REALTIME_SESSION_URL=https://your-custom-endpoint.com/v1/realtime/sessions
-NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL=https://your-custom-endpoint.com/v1/realtime
-```
-
-#### **Session Configuration**
-
-```typescript
-const sessionConfig = {
-  model: process.env.NEXT_PUBLIC_OPENAI_MODEL,
-  voice: 'echo', // or 'alloy', 'fable', 'onyx', 'nova'
-  temperature: 0.8,
-  speed: 1.0,
-  instructions: 'You are a helpful AI assistant.',
-  modalities: ['audio', 'text'],
-  turn_detection: {
-    type: 'server_vad',
-  },
-};
-```
-
-### ⏱️ In Progress
-
-- Adding full React context support
-- Multi-session support
-- Recording & playback interface
-
----
-
-Refer to `src/lib/openai-realtime` and the demo page for full integration details.
