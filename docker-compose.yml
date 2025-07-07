@@ -1,0 +1,24 @@
+# ========================================
+# DEVELOPMENT DOCKER COMPOSE
+# ========================================
+# This docker-compose.yml is for development experimentation only.
+# Features: Volume mounting for hot reloading, development environment
+# Usage: docker-compose up --build
+# ========================================
+
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.local
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    restart: unless-stopped
