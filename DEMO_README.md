@@ -85,12 +85,14 @@ npm run dev
 ### 2. Voice Interaction
 
 #### Regular Chat Sessions
+
 - **Real-time Conversation**: Speak naturally and receive AI responses
 - **Live Transcripts**: See your speech transcribed in real-time as you speak
 - **AI Response Streaming**: Watch AI responses stream in real-time
 - **Text Input**: Optionally type messages for text-based interaction
 
 #### Transcription Sessions
+
 - **Speech-to-Text Only**: Focus on transcription without AI responses
 - **Live User Transcripts**: Real-time display of your speech
 - **Final Transcripts**: Completed messages saved to conversation history
@@ -195,13 +197,15 @@ Dedicated transcription-only interface:
 // Add speaker-specific transcript state management
 const [liveUserTranscript, setLiveUserTranscript] = useState('');
 const [liveAssistantTranscript, setLiveAssistantTranscript] = useState('');
-const [conversationHistory, setConversationHistory] = useState<Array<{
-  id: string;
-  speaker: 'user' | 'assistant';
-  text: string;
-  timestamp: Date;
-  type: 'transcript' | 'text' | 'error';
-}>>([]);
+const [conversationHistory, setConversationHistory] = useState<
+  Array<{
+    id: string;
+    speaker: 'user' | 'assistant';
+    text: string;
+    timestamp: Date;
+    type: 'transcript' | 'text' | 'error';
+  }>
+>([]);
 
 const client = new RealtimeClient({
   // User transcript callbacks
@@ -211,15 +215,18 @@ const client = new RealtimeClient({
   },
   onUserTranscriptDone: (text) => {
     setLiveUserTranscript('');
-    setConversationHistory(prev => [...prev, {
-      id: `user-${Date.now()}`,
-      speaker: 'user',
-      text,
-      timestamp: new Date(),
-      type: 'transcript'
-    }]);
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        id: `user-${Date.now()}`,
+        speaker: 'user',
+        text,
+        timestamp: new Date(),
+        type: 'transcript',
+      },
+    ]);
   },
-  
+
   // Assistant transcript callbacks
   onAssistantTranscriptDelta: (text) => {
     setLiveAssistantTranscript(text);
@@ -227,25 +234,31 @@ const client = new RealtimeClient({
   },
   onAssistantTranscriptDone: (text) => {
     setLiveAssistantTranscript('');
-    setConversationHistory(prev => [...prev, {
-      id: `assistant-${Date.now()}`,
-      speaker: 'assistant',
-      text,
-      timestamp: new Date(),
-      type: 'transcript'
-    }]);
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        id: `assistant-${Date.now()}`,
+        speaker: 'assistant',
+        text,
+        timestamp: new Date(),
+        type: 'transcript',
+      },
+    ]);
   },
-  
+
   // Error handling
   onTranscriptionError: (error) => {
     console.error('Transcription failed:', error.message);
-    setConversationHistory(prev => [...prev, {
-      id: `error-${Date.now()}`,
-      speaker: 'user',
-      text: `Transcription error: ${error.message}`,
-      timestamp: new Date(),
-      type: 'error'
-    }]);
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        id: `error-${Date.now()}`,
+        speaker: 'user',
+        text: `Transcription error: ${error.message}`,
+        timestamp: new Date(),
+        type: 'error',
+      },
+    ]);
   },
 });
 ```
@@ -257,7 +270,7 @@ const client = new RealtimeClient({
 const MessageBubble = ({ message, isLive = false }) => {
   const isUser = message.speaker === 'user';
   const isError = message.type === 'error';
-  
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
@@ -429,14 +442,17 @@ function MyComponent() {
     clientSecret: 'your_client_secret',
     model: 'gpt-4o-realtime-preview-2024-12-17',
     realtimeUrl: 'https://api.openai.com/v1/realtime/sessions',
-    
+
     // Speaker-specific transcript callbacks
     onUserTranscriptDelta: (text) => console.log('User speaking:', text),
     onUserTranscriptDone: (text) => console.log('User finished:', text),
-    onAssistantTranscriptDelta: (text) => console.log('Assistant speaking:', text),
-    onAssistantTranscriptDone: (text) => console.log('Assistant finished:', text),
-    onTranscriptionError: (error) => console.error('Transcription error:', error),
-    
+    onAssistantTranscriptDelta: (text) =>
+      console.log('Assistant speaking:', text),
+    onAssistantTranscriptDone: (text) =>
+      console.log('Assistant finished:', text),
+    onTranscriptionError: (error) =>
+      console.error('Transcription error:', error),
+
     // Legacy callbacks (still supported)
     onMessageToken: (token) => console.log('Token:', token),
     onError: (error) => console.error('Error:', error),
@@ -455,7 +471,7 @@ const client = new RealtimeClient({
   clientSecret: 'your_client_secret',
   model: 'gpt-4o-realtime-preview-2024-12-17',
   realtimeUrl: 'https://api.openai.com/v1/realtime/sessions',
-  
+
   // Speaker-specific transcript callbacks
   onUserTranscriptDelta: (text) => {
     // Handle live user transcript updates
@@ -467,7 +483,7 @@ const client = new RealtimeClient({
       speaker: 'user',
       text,
       timestamp: new Date(),
-      type: 'transcript'
+      type: 'transcript',
     });
   },
   onAssistantTranscriptDelta: (text) => {
@@ -480,7 +496,7 @@ const client = new RealtimeClient({
       speaker: 'assistant',
       text,
       timestamp: new Date(),
-      type: 'transcript'
+      type: 'transcript',
     });
   },
   onTranscriptionError: (error) => {

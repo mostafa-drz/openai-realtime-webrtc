@@ -18,6 +18,21 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 
 ### 🚀 Quick Start
 
+> **💡 Don't have Node.js installed?** Use Docker instead:
+> ```bash
+> git clone https://github.com/mostafa-drz/openai-realtime-webrtc.git
+> cd openai-realtime-webrtc
+> cp env.example .env.local
+> # Edit .env.local with your OpenAI API key
+> docker-compose up --build
+> ```
+> 
+> **Or with Docker directly:**
+> ```bash
+> docker build -t app .
+> docker run -p 3000:3000 --env-file .env.local app
+> ```
+
 #### **Prerequisites**
 
 - Node.js 18+ and npm
@@ -28,7 +43,7 @@ This project provides a reusable, minimal boilerplate to integrate the OpenAI Re
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/mostafa-drz/openai-realtime-webrtc.git
 cd openai-realtime-webrtc
 
 # Install dependencies
@@ -73,6 +88,25 @@ npm run dev
 
 # Open http://localhost:3000
 ```
+
+#### **Docker Development (Recommended for Quick Start)**
+
+```bash
+# Using Docker Compose (with hot reloading)
+docker-compose up --build
+
+# Or using Docker directly
+docker build -t app .
+docker run -p 3000:3000 --env-file .env.local app
+
+# Open http://localhost:3000
+```
+
+**Docker Benefits:**
+- ✅ No Node.js installation required
+- ✅ Hot reloading with code changes
+- ✅ Consistent environment across machines
+- ✅ Quick setup for experimentation
 
 ### 🧠 Architecture
 
