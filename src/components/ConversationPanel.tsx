@@ -10,14 +10,27 @@ interface EventLogItem {
   timestamp: Date;
 }
 
+interface ConversationHistoryItem {
+  id: string;
+  speaker: 'user' | 'assistant';
+  text: string;
+  timestamp: Date;
+  type: 'transcript' | 'text' | 'error';
+}
+
 interface ConversationPanelProps {
   connected: boolean;
   events: EventLogItem[];
   conversationItems: Item[];
   isResponding: boolean;
-  modalities?: string[];
   onSendTextMessage: (text: string) => void;
   sessionType: string;
+  // New transcript props
+  liveUserTranscript: string;
+  liveAssistantTranscript: string;
+  liveTextTokens: string;
+  conversationHistory: ConversationHistoryItem[];
+  transcriptionError: string | null;
 }
 
 export function ConversationPanel({
@@ -25,77 +38,28 @@ export function ConversationPanel({
   events,
   conversationItems,
   isResponding,
-  modalities = ['audio', 'text'],
   onSendTextMessage,
   sessionType,
+  // New transcript props
+  liveUserTranscript,
+  liveAssistantTranscript,
+  liveTextTokens,
+  conversationHistory,
+  transcriptionError,
 }: ConversationPanelProps) {
   const [textInput, setTextInput] = useState('');
   const conversationEndRef = useRef<HTMLDivElement>(null);
 
-  // Group events by conversation flow using real event types
-  const conversationEvents = events.filter((event) =>
-    [
-      'response.text.delta',
-      'response.audio_transcript.delta',
-      'response.audio_transcript.done',
-      'conversation.item.input_audio_transcription.delta',
-      'conversation.item.input_audio_transcription.completed',
-      'session.created',
-      'session.updated',
-      'conversation.item.created',
-      'response.created',
-      'response.done',
-      'input_audio_buffer.speech_started',
-      'input_audio_buffer.speech_stopped',
-    ].includes(event.type)
-  );
-
-  // Get current conversation state from events
-  // Handle input audio transcription (user speech) - both delta and completed events
-  const currentInputTranscript = events
-    .filter(
-      (e) =>
-        e.type === 'conversation.item.input_audio_transcription.delta' ||
-        e.type === 'conversation.item.input_audio_transcription.completed'
-    )
-    .map((e) => {
-      // The event data is nested in e.data.data for raw events
-      const eventData = e.data.data as { delta?: string; transcript?: string };
-      return eventData?.delta || eventData?.transcript || '';
-    })
-    .join('');
-
-  // Handle response audio transcript (AI speech) - both delta and done events
-  const currentResponseTranscript = events
-    .filter(
-      (e) =>
-        e.type === 'response.audio_transcript.delta' ||
-        e.type === 'response.audio_transcript.done'
-    )
-    .map((e) => {
-      // The event data is nested in e.data.data for raw events
-      const eventData = e.data.data as { delta?: string; transcript?: string };
-      return eventData?.delta || eventData?.transcript || '';
-    })
-    .join(' ');
-
-  const currentResponse = events
-    .filter((e) => e.type === 'response.text.delta')
-    .map((e) => {
-      // The event data is nested in e.data.data for raw events
-      const eventData = e.data.data as { delta?: string };
-      return eventData?.delta || '';
-    })
-    .join('');
-
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new content arrives
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [
     conversationItems,
-    currentInputTranscript,
-    currentResponseTranscript,
-    currentResponse,
+    liveUserTranscript,
+    liveAssistantTranscript,
+    liveTextTokens,
+    conversationHistory,
+    transcriptionError,
   ]);
 
   // Handle text message submission
@@ -113,7 +77,80 @@ export function ConversationPanel({
     }
   };
 
-  // Render conversation items as chat thread
+  // Render a single message bubble
+  const renderMessage = (item: ConversationHistoryItem) => {
+    const isUser = item.speaker === 'user';
+    const isError = item.type === 'error';
+
+    return (
+      <div
+        key={item.id}
+        className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
+      >
+        <div
+          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+            isError
+              ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+              : isUser
+                ? 'bg-blue-500 text-white'
+                : 'bg-green-500 text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs opacity-75">
+              {isUser ? '👤 You' : '🤖 Assistant'}
+            </span>
+            <span className="text-xs opacity-50">
+              {item.timestamp.toLocaleTimeString()}
+            </span>
+          </div>
+          <p className="text-sm">{item.text}</p>
+        </div>
+      </div>
+    );
+  };
+
+  // Render live user transcript (streaming)
+  const renderLiveUserTranscript = () => {
+    if (!liveUserTranscript) return null;
+
+    return (
+      <div className="flex justify-end mb-4">
+        <div className="max-w-xs lg:max-w-md px-4 py-2 rounded-lg bg-blue-400 text-white">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs opacity-75">👤 You (speaking...)</span>
+          </div>
+          <p className="text-sm">
+            {liveUserTranscript}
+            <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  // Render live assistant transcript (streaming)
+  const renderLiveAssistantTranscript = () => {
+    if (!liveAssistantTranscript && !liveTextTokens) return null;
+
+    return (
+      <div className="flex justify-start mb-4">
+        <div className="max-w-xs lg:max-w-md px-4 py-2 rounded-lg bg-green-400 text-white">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs opacity-75">
+              🤖 Assistant (speaking...)
+            </span>
+          </div>
+          <p className="text-sm">
+            {liveAssistantTranscript || liveTextTokens}
+            <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  // Render legacy conversation items (for backward compatibility)
   const renderConversationItems = () => {
     return conversationItems.map((item, index) => {
       if (item.type === 'message') {
@@ -128,40 +165,19 @@ export function ConversationPanel({
           return (
             <div
               key={item.id || index}
-              className={`p-4 rounded-lg ${
-                isUser
-                  ? 'bg-blue-50 dark:bg-blue-900/20'
-                  : 'bg-green-50 dark:bg-green-900/20'
-              }`}
+              className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
             >
-              <div className="flex items-start gap-3">
-                <div
-                  className={`w-8 h-8 text-white rounded-full flex items-center justify-center text-sm font-medium ${
-                    isUser ? 'bg-blue-600' : 'bg-green-600'
-                  }`}
-                >
-                  {isUser ? 'U' : 'AI'}
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  isUser ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs opacity-75">
+                    {isUser ? '👤 You' : '🤖 Assistant'}
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <p
-                    className={`text-sm font-medium mb-1 ${
-                      isUser
-                        ? 'text-blue-900 dark:text-blue-100'
-                        : 'text-green-900 dark:text-green-100'
-                    }`}
-                  >
-                    {isUser ? 'You said:' : 'AI Response:'}
-                  </p>
-                  <p
-                    className={
-                      isUser
-                        ? 'text-blue-800 dark:text-blue-200'
-                        : 'text-green-800 dark:text-green-200'
-                    }
-                  >
-                    {textContent.text}
-                  </p>
-                </div>
+                <p className="text-sm">{textContent.text}</p>
               </div>
             </div>
           );
@@ -179,82 +195,26 @@ export function ConversationPanel({
 
       <div className="flex-1 flex flex-col min-h-0">
         {/* Conversation Flow - Scrollable Area */}
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-          {/* Conversation Items */}
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+          {/* Legacy Conversation Items (for backward compatibility) */}
           {conversationItems.length > 0 && (
             <div className="space-y-4">{renderConversationItems()}</div>
           )}
 
-          {/* Current Live Input/Response (streaming, not yet committed) */}
-          {(currentInputTranscript ||
-            currentResponseTranscript ||
-            currentResponse) && (
-            <div className="space-y-4">
-              {/* User Input (streaming) */}
-              {currentInputTranscript && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                      U
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                        You said:
-                      </p>
-                      <p className="text-blue-800 dark:text-blue-200">
-                        &quot;{currentInputTranscript}&quot;
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* New Conversation History */}
+          {conversationHistory.map(renderMessage)}
 
-              {/* AI Response (streaming) */}
-              {currentResponseTranscript && (
-                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                      AI
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
-                        AI Response:
-                      </p>
-                      <p className="text-green-800 dark:text-green-200">
-                        &quot;{currentResponseTranscript}&quot;
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* AI Response (text, streaming) */}
-              {currentResponse && (
-                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                      AI
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
-                        AI Response:
-                      </p>
-                      <p className="text-green-800 dark:text-green-200">
-                        {currentResponse}
-                        <span className="inline-block w-2 h-4 bg-green-600 dark:bg-green-400 ml-1 animate-pulse" />
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Live Transcripts (streaming) */}
+          {renderLiveUserTranscript()}
+          {renderLiveAssistantTranscript()}
 
           {/* Empty State */}
-          {!currentInputTranscript &&
-            !currentResponseTranscript &&
-            !currentResponse &&
+          {!liveUserTranscript &&
+            !liveAssistantTranscript &&
+            !liveTextTokens &&
+            conversationHistory.length === 0 &&
             conversationItems.length === 0 &&
+            !transcriptionError &&
             connected && (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                 <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
@@ -274,8 +234,7 @@ export function ConversationPanel({
                 </div>
                 <p className="text-lg font-medium mb-2">Ready to Chat</p>
                 <p className="text-sm">
-                  Use voice recording or type a message to begin your
-                  conversation
+                  Start speaking or type a message to begin the conversation
                 </p>
               </div>
             )}
@@ -307,39 +266,40 @@ export function ConversationPanel({
           <div ref={conversationEndRef} />
         </div>
 
-        {/* Text Input - Fixed at bottom */}
-        {connected &&
-          modalities.includes('text') &&
-          sessionType !== 'transcription' && (
-            <div className="space-y-2 mt-4 flex-shrink-0">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Send Text Message
-              </label>
-              <div className="flex gap-2">
-                <textarea
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isResponding}
-                  className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                  rows={2}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!textInput.trim() || isResponding}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium self-end"
-                >
-                  Send
-                </button>
-              </div>
+        {/* Text Input (only for regular sessions) */}
+        {sessionType === 'regular' && connected && (
+          <div className="flex-shrink-0 mt-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type a message..."
+                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isResponding}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!textInput.trim() || isResponding}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Send
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-        {/* Event Counter */}
+        {/* Status Bar */}
         <div className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4 flex-shrink-0">
-          {conversationEvents.length} events logged • {conversationItems.length}{' '}
-          conversation items
+          {conversationHistory.length + conversationItems.length} messages •{' '}
+          {events.length} events logged
+          {transcriptionError && (
+            <span className="text-red-500 ml-2">• Error detected</span>
+          )}
+          {isResponding && (
+            <span className="text-green-500 ml-2">• AI responding</span>
+          )}
         </div>
       </div>
     </div>

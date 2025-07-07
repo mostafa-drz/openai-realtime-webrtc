@@ -20,7 +20,6 @@ export interface RealtimeClientConfig {
   dataChannelLabel?: string;
   sessionType?: SessionType;
   onMessageToken?: (token: string) => void;
-  onTranscript?: (text: string) => void;
   onConnectionStateChange?: (state: ConnectionState) => void;
   onError?: (error: Error) => void;
   // High-level callbacks
@@ -31,6 +30,12 @@ export interface RealtimeClientConfig {
   onSpeechStopped?: () => void;
   // Raw event access
   onRawEvent?: (event: ServerEvent) => void;
+  // Speaker-specific transcript callbacks
+  onUserTranscriptDelta?: (text: string) => void;
+  onUserTranscriptDone?: (text: string) => void;
+  onAssistantTranscriptDelta?: (text: string) => void;
+  onAssistantTranscriptDone?: (text: string) => void;
+  onTranscriptionError?: (error: Error) => void;
 }
 
 export type SessionType = 'regular' | 'transcription';
@@ -61,6 +66,12 @@ export class RealtimeClient {
     this.dataChannel.send(JSON.stringify(event));
   }
 
+  private logUnhandledEvent(eventType: string, data?: unknown) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[RealtimeClient] Unhandled ${eventType} event:`, data);
+    }
+  }
+
   private handleServerEvent(event: ServerEvent) {
     // Always call raw event handler first
     this.config.onRawEvent?.(event);
@@ -84,7 +95,42 @@ export class RealtimeClient {
       }
       case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DELTA: {
         const transcript = event?.delta || '';
-        this.config.onTranscript?.(transcript);
+        this.config.onAssistantTranscriptDelta?.(transcript);
+        if (!this.config.onAssistantTranscriptDelta) {
+          this.logUnhandledEvent('assistant transcript delta', transcript);
+        }
+        break;
+      }
+      case ServerEventType.RESPONSE_AUDIO_TRANSCRIPT_DONE: {
+        const transcript = event?.transcript || '';
+        this.config.onAssistantTranscriptDone?.(transcript);
+        if (!this.config.onAssistantTranscriptDone) {
+          this.logUnhandledEvent('assistant transcript done', transcript);
+        }
+        break;
+      }
+      case ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_DELTA: {
+        const transcript = event?.delta || '';
+        this.config.onUserTranscriptDelta?.(transcript);
+        if (!this.config.onUserTranscriptDelta) {
+          this.logUnhandledEvent('user transcript delta', transcript);
+        }
+        break;
+      }
+      case ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED: {
+        const transcript = event?.transcript || '';
+        this.config.onUserTranscriptDone?.(transcript);
+        if (!this.config.onUserTranscriptDone) {
+          this.logUnhandledEvent('user transcript done', transcript);
+        }
+        break;
+      }
+      case ServerEventType.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_FAILED: {
+        const error = new Error(event?.error.message || 'Transcription failed');
+        this.config.onTranscriptionError?.(error);
+        if (!this.config.onTranscriptionError) {
+          this.logUnhandledEvent('transcription error', error.message);
+        }
         break;
       }
       case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED: {

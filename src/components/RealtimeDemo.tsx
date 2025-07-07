@@ -12,7 +12,6 @@ import {
   ServerEventType,
   TranscriptionModel,
   Item,
-  ContentType,
   AudioFormat,
 } from '@/lib/openai-realtime/types';
 import {
@@ -63,32 +62,6 @@ interface EventLogItem {
   timestamp: Date;
 }
 
-// Type guards for content blocks
-function isAudioContent(
-  content: unknown
-): content is { type: 'audio'; transcript?: string } {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    (content as { type?: unknown }).type === 'audio' &&
-    'transcript' in content &&
-    typeof (content as { transcript?: unknown }).transcript === 'string'
-  );
-}
-function isTextContent(
-  content: unknown
-): content is { type: 'text'; text?: string } {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    (content as { type?: unknown }).type === 'text' &&
-    'text' in content &&
-    typeof (content as { text?: unknown }).text === 'string'
-  );
-}
-
 export function RealtimeDemo() {
   const [sessionConfig, setSessionConfig] =
     useState<SessionConfig>(defaultSessionConfig);
@@ -100,11 +73,28 @@ export function RealtimeDemo() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [isResponding, setIsResponding] = useState(false);
-  const [conversationItems, setConversationItems] = useState<Item[]>([]);
+  const [conversationItems] = useState<Item[]>([]);
   const [micActive, setMicActive] = useState(false);
   const [sessionType, setSessionType] = useState<'regular' | 'transcription'>(
     'regular'
   );
+
+  // New transcript state management
+  const [liveUserTranscript, setLiveUserTranscript] = useState('');
+  const [liveAssistantTranscript, setLiveAssistantTranscript] = useState('');
+  const [liveTextTokens, setLiveTextTokens] = useState('');
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(
+    null
+  );
+  const [conversationHistory, setConversationHistory] = useState<
+    Array<{
+      id: string;
+      speaker: 'user' | 'assistant';
+      text: string;
+      timestamp: Date;
+      type: 'transcript' | 'text' | 'error';
+    }>
+  >([]);
 
   const clientRef = useRef<RealtimeClient | null>(null);
 
@@ -145,13 +135,78 @@ export function RealtimeDemo() {
         process.env.NEXT_PUBLIC_OPENAI_REALTIME_WEBRTC_URL ||
         'https://api.openai.com/v1/realtime',
       sessionType,
-      // Event log for debugging
+      // Speaker-specific transcript callbacks
+      onUserTranscriptDelta: (text: string) => {
+        setLiveUserTranscript(text);
+        setTranscriptionError(null); // Clear any previous errors
+        addEvent('user_transcript_delta', { text });
+      },
+      onUserTranscriptDone: (text: string) => {
+        setLiveUserTranscript(''); // Clear live transcript
+        setConversationHistory((prev) => [
+          ...prev,
+          {
+            id: `user-${Date.now()}`,
+            speaker: 'user',
+            text,
+            timestamp: new Date(),
+            type: 'transcript',
+          },
+        ]);
+        addEvent('user_transcript_done', { text });
+      },
+      onAssistantTranscriptDelta: (text: string) => {
+        setLiveAssistantTranscript(text);
+        addEvent('assistant_transcript_delta', { text });
+      },
+      onAssistantTranscriptDone: (text: string) => {
+        setLiveAssistantTranscript(''); // Clear live transcript
+        setConversationHistory((prev) => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            speaker: 'assistant',
+            text,
+            timestamp: new Date(),
+            type: 'transcript',
+          },
+        ]);
+        addEvent('assistant_transcript_done', { text });
+      },
+      onTranscriptionError: (error: Error) => {
+        setTranscriptionError(error.message);
+        setConversationHistory((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            speaker: 'user',
+            text: `Transcription error: ${error.message}`,
+            timestamp: new Date(),
+            type: 'error',
+          },
+        ]);
+        addEvent('transcription_error', { error: error.message });
+      },
+      // Legacy callbacks for backward compatibility
+      onMessageToken: (token: string) => {
+        setLiveTextTokens((prev) => prev + token);
+        addEvent('message_token', { token });
+      },
+      onConnectionStateChange: (state) => {
+        setConnected(state === 'connected');
+        addEvent('connection_state_change', { state });
+      },
+      onError: (err) => {
+        setError(err);
+        addEvent(ServerEventType.ERROR, { error: err.message });
+      },
+      // Raw event access for debugging
       onRawEvent: (event: ServerEvent) => {
         addEvent(event.type, {
           event_id: event.event_id,
           data: event,
         });
-        // Only manage state here, not chat thread
+        // Handle speech detection
         switch (event.type) {
           case ServerEventType.INPUT_AUDIO_BUFFER_SPEECH_STARTED:
             setMicActive(true);
@@ -161,115 +216,15 @@ export function RealtimeDemo() {
             // Auto-commit audio for transcription
             clientRef.current?.commitAudioBuffer();
             break;
-          case ServerEventType.INPUT_AUDIO_BUFFER_COMMITTED:
-            break;
-          case ServerEventType.INPUT_AUDIO_BUFFER_CLEARED:
-            break;
-          case ServerEventType.SESSION_CREATED:
-            break;
           case ServerEventType.RESPONSE_CREATED:
             setIsResponding(true);
             break;
           case ServerEventType.RESPONSE_DONE:
             setIsResponding(false);
-            break;
-          case ServerEventType.ERROR:
-            setError(new Error(event.error?.message || 'Unknown error'));
+            // Clear live text tokens when response is done
+            setLiveTextTokens('');
             break;
         }
-      },
-      // Use high-level API for chat thread
-      onConversationItemCreated: (item) => {
-        if (
-          item.type === 'message' &&
-          'role' in item &&
-          'content' in item &&
-          item.role === 'user'
-        ) {
-          // Only add if there is a valid text content
-          const textContent = item.content.find(
-            (c) =>
-              isTextContent(c) ||
-              (c.type === 'input_text' &&
-                typeof (c as { text?: unknown }).text === 'string')
-          );
-          let contentBlock: { type: ContentType.TEXT; text: string } | null =
-            null;
-          if (textContent && isTextContent(textContent)) {
-            const tc = textContent as {
-              type: ContentType.TEXT;
-              text: string;
-            };
-
-            contentBlock = { type: ContentType.TEXT, text: tc.text };
-          } else if (
-            textContent &&
-            textContent.type === 'input_text' &&
-            typeof (textContent as { text?: unknown }).text === 'string'
-          ) {
-            contentBlock = {
-              type: ContentType.TEXT,
-              text: (textContent as { text: string }).text,
-            };
-          }
-          if (contentBlock) {
-            setConversationItems((prev) => [
-              ...prev,
-              { ...item, content: [contentBlock] },
-            ]);
-          }
-        }
-      },
-      onResponseDone: (response) => {
-        response.output.forEach((item) => {
-          if (
-            item.type === 'message' &&
-            'role' in item &&
-            'content' in item &&
-            item.role === 'assistant'
-          ) {
-            // Extract only the first transcript or text
-            const transcriptContent = item.content.find(isAudioContent);
-            const textContent = item.content.find(isTextContent);
-            let contentBlock: { type: ContentType.TEXT; text: string } | null =
-              null;
-            if (transcriptContent && isAudioContent(transcriptContent)) {
-              const tc = transcriptContent as {
-                type: 'audio';
-                transcript: string;
-              };
-
-              contentBlock = {
-                type: ContentType.TEXT,
-                text: tc.transcript,
-              };
-            } else if (textContent && isTextContent(textContent)) {
-              const tc = textContent as {
-                type: ContentType.TEXT;
-                text: string;
-              };
-
-              contentBlock = {
-                type: ContentType.TEXT,
-                text: tc.text,
-              };
-            }
-            if (contentBlock) {
-              setConversationItems((prev) => [
-                ...prev,
-                { ...item, content: [contentBlock] },
-              ]);
-            }
-          }
-        });
-      },
-      onConnectionStateChange: (state) => {
-        setConnected(state === 'connected');
-        addEvent('connection_state_change', { state });
-      },
-      onError: (err) => {
-        setError(err);
-        addEvent(ServerEventType.ERROR, { error: err.message });
       },
     });
 
@@ -544,12 +499,24 @@ export function RealtimeDemo() {
             events={events}
             conversationItems={conversationItems}
             isResponding={isResponding}
-            modalities={sessionConfig.modalities}
             onSendTextMessage={handleSendTextMessage}
             sessionType={sessionType}
+            // New transcript props
+            liveUserTranscript={liveUserTranscript}
+            liveAssistantTranscript={liveAssistantTranscript}
+            liveTextTokens={liveTextTokens}
+            conversationHistory={conversationHistory}
+            transcriptionError={transcriptionError}
           />
         ) : (
-          <TranscriptionPanel connected={connected} events={events} />
+          <TranscriptionPanel
+            connected={connected}
+            events={events}
+            // New transcript props
+            liveUserTranscript={liveUserTranscript}
+            conversationHistory={conversationHistory}
+            transcriptionError={transcriptionError}
+          />
         )}
       </div>
 
